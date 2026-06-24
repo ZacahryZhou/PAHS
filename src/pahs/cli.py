@@ -1,0 +1,85 @@
+"""PAHS command-line interface — Week 1."""
+
+from __future__ import annotations
+
+import json
+
+import typer
+
+from pahs.gateway.run_ids import new_run_id
+from pahs.graph.runner import resume_run, start_run
+from pahs.storage import db
+
+app = typer.Typer(help="Personal Agent Harness System (PAHS)")
+
+
+@app.command("init-db")
+def init_db() -> None:
+    """Initialize SQLite schema."""
+    path = db.init_db()
+    typer.echo(f"Database initialized: {path}")
+
+
+@app.command("run")
+def run_command(command: str) -> None:
+    """Start a new run from the CLI."""
+    db.init_db()
+    run_id = new_run_id()
+    typer.echo(f"Starting run: {run_id}")
+    result = start_run(run_id, command, channel="cli")
+
+    if result.get("__interrupt__"):
+        typer.echo("\nRun paused for review. Use `pah pending` and `pah reply`.")
+        typer.echo("运行已暂停，等待审核。请使用 `pah pending` 和 `pah reply`。")
+    else:
+        typer.echo(json.dumps(result, ensure_ascii=False, indent=2, default=str))
+
+
+@app.command("status")
+def status(run_id: str) -> None:
+    """Show run status."""
+    db.init_db()
+    row = db.get_run(run_id)
+    if row is None:
+        raise typer.Exit(code=1)
+    typer.echo(json.dumps(row, ensure_ascii=False, indent=2))
+
+
+@app.command("pending")
+def pending() -> None:
+    """List pending reviews."""
+    db.init_db()
+    rows = db.list_pending_reviews()
+    if not rows:
+        typer.echo("No pending reviews.")
+        typer.echo("没有待审核任务。")
+        return
+    for row in rows:
+        typer.echo(
+            f"- run_id={row['run_id']} type={row['review_type']} command={row['command']}"
+        )
+
+
+@app.command("reply")
+def reply(run_id: str, message: str) -> None:
+    """Reply to the current pending review for a run."""
+    db.init_db()
+    try:
+        result = resume_run(run_id, message, channel="cli")
+    except ValueError as exc:
+        typer.echo(str(exc))
+        raise typer.Exit(code=1) from exc
+
+    if result.get("__interrupt__"):
+        typer.echo("\nRun paused again for final feedback.")
+        typer.echo("运行再次暂停，等待总反馈。")
+        typer.echo("Example | 示例: pah reply <run_id> \"looks good\"")
+    elif result.get("status") == "COMPLETED":
+        typer.echo("\nRun completed.")
+        typer.echo("运行已完成。")
+    else:
+        typer.echo(json.dumps(result, ensure_ascii=False, indent=2, default=str))
+
+
+if __name__ == "__main__":
+    app()

@@ -1,0 +1,2 @@
+[console_scripts]
+pah = pahs.cli:app

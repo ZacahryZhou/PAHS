@@ -1,0 +1,57 @@
+models:
+  deepseek-chat:
+    provider: deepseek
+    role: default
+    use_for:
+      - triage
+      - orchestrator
+      - creator
+      - search_summary
+      - verifier
+      - learner
+
+  deepseek-reasoner:
+    provider: deepseek
+    role: deep_reasoning
+    use_for:
+      - deep_think
+
+  claude-sonnet:
+    provider: anthropic
+    role: high_quality
+    use_for:
+      - builder
+      - high_quality_content
+
+  gpt-4o:
+    provider: openai
+    role: high_quality_multimodal
+    use_for:
+      - high_quality_content
+      - visual_tasks
+
+  kimi-k2:
+    provider: kimi
+    role: batch_code
+    use_for:
+      - batch_code
+
+routing_defaults:
+  triage: deepseek-chat
+  orchestrator_lite: deepseek-chat
+  orchestrator_full: deepseek-chat
+  deep_think: deepseek-reasoner
+  creator: deepseek-chat
+  creator_high_quality: claude-sonnet
+  searcher_summary: deepseek-chat
+  code: deepseek-chat
+  batch_code: kimi-k2
+  analysis: deepseek-chat
+  verifier_gray_area: deepseek-chat
+  learner: deepseek-chat
+  builder: claude-sonnet
+
+downgrade_chain:
+  claude-sonnet: deepseek-chat
+  gpt-4o: deepseek-chat
+  deepseek-reasoner: deepseek-chat

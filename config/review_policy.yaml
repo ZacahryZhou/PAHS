@@ -1,0 +1,20 @@
+review_policy:
+  simple:
+    plan_confirmation: false
+    milestone_reviews: final_only
+    max_milestones: 1
+
+  medium:
+    plan_confirmation: false
+    milestone_reviews: key_milestones
+    max_milestones: 3
+
+  complex:
+    plan_confirmation: true
+    milestone_reviews: every_milestone
+    max_milestones: 5
+
+final_feedback:
+  ask_after_every_completed_run: true
+  learner_uses_final_feedback_only: true
+  milestone_feedback_is_run_local: true

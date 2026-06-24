@@ -1,0 +1,20 @@
+budget:
+  daily:
+    token_limit: 80000
+    cost_limit_usd: 0.80
+    alert_threshold: 0.70
+
+  per_run:
+    token_limit: 12000
+    cost_limit_usd: 0.10
+    alert_threshold: 0.70
+
+  per_step:
+    token_limit: 4000
+    max_retries: 2
+
+behavior:
+  if_daily_alert_reached: prefer_cheaper_models
+  if_run_alert_reached: ask_before_expensive_step
+  if_hard_limit_reached: pause_and_ask_user
+  stage_2_llm_verification: gray_area_only

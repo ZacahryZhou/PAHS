@@ -202,7 +202,7 @@
     .review-box.visible { display: flex; }
     .review-preview {
       flex: 1;
-      min-height: 160px;
+      min-height: 0;
       padding: 16px;
       font-size: 0.9rem;
       line-height: 1.6;
@@ -210,8 +210,47 @@
       white-space: pre-wrap;
       background: #fafafa;
     }
-    .chat-panel.review-mode #messages { flex: 0 0 64px; max-height: 64px; overflow: hidden; opacity: .7; }
-    .chat-panel.review-mode .review-box { flex: 1; }
+    .cap-warn {
+      margin-bottom: 12px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      background: #fff7ed;
+      border: 1px solid #fed7aa;
+      color: #9a3412;
+      font-size: 0.82rem;
+      line-height: 1.5;
+      white-space: normal;
+    }
+    .review-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 12px;
+    }
+    .review-meta .pill {
+      font-size: 0.68rem;
+      font-family: ui-monospace, monospace;
+      padding: 3px 8px;
+      border-radius: 6px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--muted);
+    }
+    .review-output {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px;
+      white-space: pre-wrap;
+      line-height: 1.6;
+    }
+    .review-foot {
+      margin-top: 12px;
+      font-size: 0.78rem;
+      color: var(--muted);
+    }
+    .chat-panel.review-mode #messages { display: none; }
+    .chat-panel.review-mode .review-box { flex: 1; min-height: 0; }
 
     .path-legend {
       display: flex;
@@ -594,19 +633,74 @@
       return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
     }
 
+    function getExecutionPlan() {
+      const snap = lastProgress && lastProgress.snapshot && lastProgress.snapshot.execution_plan;
+      const hasTasks = snap && (snap.phases || []).some((p) => (p.tasks || []).length);
+      if (hasTasks) return snap;
+      const evs = ((lastProgress && lastProgress.node_details) || {}).orchestrator_plan || [];
+      const created = evs.find((e) => e.event_type === "orchestrator_plan_created");
+      if (created && created.payload && created.payload.execution_plan) {
+        return created.payload.execution_plan;
+      }
+      return snap;
+    }
+
+    function capabilityWarning(command) {
+      if (!command) return "";
+      if (!/开通|注册|账号|开户|视频号|bilibili|youtube|tiktok|instagram|管理.{0,4}(账号|号)|平台账号/i.test(command)) {
+        return "";
+      }
+      return "⚠️ 能力边界：当前 PAHS 无法代你开通或管理真实平台账号（无浏览器自动化 / 平台 API 工具）。"
+        + "已批准工具：search_web、generate_content、run_python、SMAS/PIP 内容生产。"
+        + "Creator 只能提供方案与文案，不能执行开户操作。";
+    }
+
+    function formatPresentation(raw) {
+      if (!raw) return "<p style='color:var(--muted)'>(无产出)</p>";
+      const lines = raw.split("\n");
+      const meta = [];
+      const body = [];
+      for (const line of lines) {
+        if (line.startsWith("## ")) continue;
+        if (line.startsWith("Reply with") || line.startsWith("回复 ")) continue;
+        if (/^(Run|Worker|Mode|Model|Est\.|Milestone|Complexity|Plan):/.test(line)) {
+          meta.push(line.replace(/`/g, ""));
+        } else if (line.trim()) {
+          body.push(line);
+        }
+      }
+      let html = "";
+      if (meta.length) {
+        html += `<div class="review-meta">${meta.map((m) => `<span class="pill">${escapeHtml(m)}</span>`).join("")}</div>`;
+      }
+      html += `<div class="review-output">${escapeHtml(body.join("\n").trim() || raw)}</div>`;
+      html += `<div class="review-foot">满意请点「通过」，需要修改请在下方输入意见后提交。</div>`;
+      return html;
+    }
+
     function formatPlanCards(plan) {
-      if (!plan || !plan.phases) return "";
+      if (!plan) return "<p style='color:var(--muted)'>暂无任务表</p>";
       let html = `<p style="margin:0 0 8px;color:var(--muted)">${escapeHtml(plan.intent_summary || "")}</p>`;
-      html += `<p style="margin:0 0 10px;font-size:0.72rem">复杂度 ${escapeHtml(plan.complexity_band)} · ${escapeHtml(plan.orchestrator_profile)} · 来源 ${escapeHtml(plan.source || "?")}</p>`;
-      (plan.phases || []).forEach((ph) => {
+      html += `<p style="margin:0 0 10px;font-size:0.72rem">复杂度 ${escapeHtml(plan.complexity_band || "?")} · ${escapeHtml(plan.orchestrator_profile || "?")} · 来源 ${escapeHtml(plan.source || "?")}</p>`;
+      const phases = plan.phases || [];
+      if (!phases.length) {
+        html += `<p style="color:var(--muted)">任务表 phases 为空</p>`;
+        return html;
+      }
+      let taskCount = 0;
+      phases.forEach((ph) => {
         html += `<div style="font-weight:650;margin:8px 0 4px">${escapeHtml(ph.title || ph.id)}${ph.parallel ? " ⚡并行" : ""}</div>`;
         (ph.tasks || []).forEach((t) => {
+          taskCount += 1;
           html += `<div class="task-card">
             <div class="row"><span class="tag">${escapeHtml(t.worker)}</span><span class="tag tool">${escapeHtml(t.tool || "—")}</span><span style="font-size:0.68rem;color:var(--muted)">${escapeHtml(t.id)}</span></div>
             <div class="goal">${escapeHtml(t.goal)}</div>
           </div>`;
         });
       });
+      if (!taskCount) {
+        html += `<p style="color:var(--muted)">该计划尚未分解为具体 task（仅有意图摘要）</p>`;
+      }
       return html;
     }
 
@@ -625,7 +719,7 @@
       if (!lastProgress) return "";
       const node = (lastProgress.nodes || []).find((n) => n.id === nodeId);
       const events = (lastProgress.node_details || {})[nodeId] || [];
-      const plan = lastProgress.snapshot && lastProgress.snapshot.execution_plan;
+      const plan = getExecutionPlan();
       let html = "";
 
       if (node) {
@@ -651,6 +745,15 @@
           html += `<p style="color:var(--muted)">当前任务表未分配 <strong>${escapeHtml(worker)}</strong> 任务。<br>本次运行可能走了其他 Worker 分支。</p>`;
         }
       } else if (nodeId === "triage_score") {
+        const capEv = events.find((e) => e.event_type === "capability_assessed");
+        if (capEv && capEv.payload) {
+          const gaps = capEv.payload.gaps || [];
+          html += `<div class="task-card"><div class="goal"><strong>能力检查</strong><br>`;
+          html += gaps.length
+            ? gaps.map((g) => escapeHtml(g.message || "")).join("<br>")
+            : "当前请求在已批准工具范围内";
+          html += `</div></div>`;
+        }
         const ev = events.find((e) => e.event_type === "triage_routing");
         if (ev && ev.payload) {
           const rc = ev.payload.routing_context || ev.payload;
@@ -776,7 +879,10 @@
       if (snap && snap.waiting_review) {
         reviewBox.classList.add("visible");
         mainComposer.style.display = "none";
-        reviewPreview.textContent = snap.interrupt_message || "(无产出)";
+        const warn = capabilityWarning(snap.command || "");
+        reviewPreview.innerHTML =
+          (warn ? `<div class="cap-warn">${escapeHtml(warn)}</div>` : "") +
+          formatPresentation(snap.interrupt_message || "");
         chatPanel.classList.add("review-mode");
       } else {
         reviewBox.classList.remove("visible");

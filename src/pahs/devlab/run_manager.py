@@ -197,4 +197,5 @@ def run_snapshot(run_id: str) -> dict[str, Any]:
         "plan_source": plan.get("plan_source"),
         "orchestrator_profile": row.get("orchestrator_profile"),
         "current_milestone_id": row.get("current_milestone_id"),
+        "command": row.get("command"),
     }

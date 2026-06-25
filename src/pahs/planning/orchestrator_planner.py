@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from pahs.harness.capability_brief import format_capability_brief_for_prompt
 from pahs.planning.capability_catalog import build_capability_catalog, format_catalog_for_prompt
 from pahs.planning.plan_patterns import format_patterns_for_prompt, load_plan_patterns
 from pahs.planning.schema import ExecutionPlan, PlanPhase, PlanTask, normalize_complexity_band, normalize_orchestrator_profile
@@ -90,7 +91,8 @@ def plan_with_llm(
     triage = triage_result or {}
 
     system = (
-        "You are PAHS Orchestrator. Build an internal ExecutionPlan JSON only.\n"
+        format_capability_brief_for_prompt(command, worker="orchestrator")
+        + "\n\nYou are PAHS Orchestrator. Build an internal ExecutionPlan JSON only.\n"
         "Do NOT explain to the user. Return JSON with keys:\n"
         "intent_summary, complexity_band (simple|medium|complex), "
         "orchestrator_profile (lite|full), task_type, review_policy, phases.\n"

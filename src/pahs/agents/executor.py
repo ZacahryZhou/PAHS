@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pahs.graph.state import PAHSState
-from pahs.planning.task_context import effective_task_prompt
+from pahs.planning.task_context import agent_capability_context, effective_task_prompt
 from pahs.providers.router import llm_complete
 from pahs.tools.registry import call_tool
 
@@ -13,13 +13,11 @@ def executor_node(state: PAHSState) -> dict:
     command = effective_task_prompt(state)
     feedback = state.get("user_milestone_review", "").strip()
     model = (state.get("routing_decision") or {}).get("selected_model", "deepseek-chat")
+    cap = agent_capability_context(state, worker="executor")
 
     if mode == "DEEP_THINK":
         output = llm_complete(
-            system=(
-                "You are PAHS Executor in DEEP_THINK mode. "
-                "Show structured reasoning steps, then the final answer."
-            ),
+            system=cap + "\n\nYou are PAHS Executor in DEEP_THINK mode. Show structured reasoning steps, then the final answer.",
             user=command if not feedback else f"{command}\n\nRevision request: {feedback}",
             model="deepseek-reasoner",
             run_id=state["run_id"],
@@ -32,7 +30,7 @@ def executor_node(state: PAHSState) -> dict:
         code = "values = [1, 2, 3, 4, 5]\nprint(sum(values) / len(values))"
         result = call_tool("run_python", code=code)
         interpretation = llm_complete(
-            system="You are PAHS analysis executor. Interpret the computation briefly.",
+            system=cap + "\n\nYou are PAHS analysis executor. Interpret the computation briefly.",
             user=f"Task: {command}\nPython result: {result}",
             model=model,
             run_id=state["run_id"],
@@ -48,7 +46,7 @@ def executor_node(state: PAHSState) -> dict:
 
     if any(word in command.lower() for word in ("save", "write", "file", "保存", "文件")):
         content = llm_complete(
-            system="You are PAHS code executor. Produce file content for the user task.",
+            system=cap + "\n\nYou are PAHS code executor. Produce file content for the user task.",
             user=command,
             model=model,
             run_id=state["run_id"],
@@ -66,7 +64,7 @@ def executor_node(state: PAHSState) -> dict:
         code = "print('CODE mode executed safely in sandbox')"
         result = call_tool("run_python", code=code)
         explanation = llm_complete(
-            system="You are PAHS code executor. Explain what was done and next steps.",
+            system=cap + "\n\nYou are PAHS code executor. Explain what was done and next steps.",
             user=f"Task: {command}\nSandbox result: {result}",
             model=model,
             run_id=state["run_id"],

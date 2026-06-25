@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from pahs.graph.state import PAHSState
+from pahs.harness.capability_brief import format_capability_brief_for_prompt
 from pahs.planning.schema import PlanTask, TaskArtifact
 
 
@@ -14,6 +15,13 @@ def effective_task_prompt(state: PAHSState) -> str:
         or state.get("user_milestone_review", "").strip()
         or state["user_command"]
     )
+
+
+def agent_capability_context(state: PAHSState, *, worker: str | None = None) -> str:
+    """Capability brief grounded in this PAHS install."""
+    command = str(state.get("user_command") or "")
+    active = worker or state.get("worker") or state.get("active_agent")
+    return format_capability_brief_for_prompt(command, worker=str(active) if active else None)
 
 
 def build_task_prompt(

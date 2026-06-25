@@ -1,0 +1,15 @@
+{
+  "proposal_id": "prop_20260625_224205_4380",
+  "run_id": "run_20260625_154029_4ad2",
+  "proposal_type": "user_standard",
+  "status": "pending",
+  "target_path": "standards/user_preferences.md",
+  "title": "Capture general user preference",
+  "feedback_text": "approved",
+  "proposed_content": "- User feedback: approved",
+  "rationale": "Generic final feedback captured as a pending standard.",
+  "reject_reason": null,
+  "pending_file": null,
+  "created_at": "2026-06-25T22:42:05.127590+00:00",
+  "resolved_at": null
+}

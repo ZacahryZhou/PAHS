@@ -75,6 +75,7 @@ EVENT_TO_GRAPH_NODE: dict[str, str] = {
     "devlab_run_started": "ingest",
     "rules_loaded": "load_global_rules",
     "triage_routing": "triage_score",
+    "capability_assessed": "triage_score",
     "orchestrator_plan_created": "orchestrator_plan",
     "plan_validated": "plan_validate",
     "environment_precheck": "env_precheck",
@@ -174,6 +175,13 @@ def build_graph_progress(
         summary = et.replace("_", " ")
         if et == "triage_routing":
             summary = f"Triage → {payload.get('worker', '?')}"
+        elif et == "capability_assessed":
+            gaps = payload.get("gaps") or []
+            summary = (
+                "Capability OK"
+                if not gaps
+                else f"Capability gaps: {len(gaps)}"
+            )
         elif et == "orchestrator_plan_created":
             summary = f"Plan {payload.get('phase_count')} phases, source={payload.get('plan_source')}"
         elif et == "plan_phase_executed":

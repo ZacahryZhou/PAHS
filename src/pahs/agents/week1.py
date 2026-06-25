@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+from pahs.harness.capability_brief import assess_command
 from pahs.config_loader import review_policy_for_band
 from pahs.graph.state import PAHSState
 from pahs.planning.orchestrator_planner import build_execution_plan
-from pahs.planning.task_context import effective_task_prompt
+from pahs.planning.task_context import agent_capability_context, effective_task_prompt
 from pahs.providers.mock import mock_plan
 from pahs.providers.router import llm_complete
 from pahs.routing.cost_estimator import estimate_run_cost, record_cost_event
@@ -18,6 +19,12 @@ from pahs.storage import db
 def triage_node(state: PAHSState) -> dict:
     classified = classify_command(state["user_command"], run_id=state["run_id"])
     band = classified["complexity_band"]
+    capability = assess_command(state["user_command"])
+    db.log_event(
+        state["run_id"],
+        "capability_assessed",
+        capability,
+    )
     db.log_event(
         state["run_id"],
         "triage_routing",
@@ -132,8 +139,8 @@ def creator_node(state: PAHSState) -> dict:
     model = (state.get("routing_decision") or {}).get("selected_model", "deepseek-chat")
     output = llm_complete(
         system=(
-            "You are PAHS Creator. Write the deliverable requested by the user. "
-            "Be clear, useful, and concise unless the user asks for length."
+            agent_capability_context(state, worker="creator")
+            + "\n\nYou are PAHS Creator. Write the deliverable requested by the user."
         ),
         user=effective_task_prompt(state),
         model=model,

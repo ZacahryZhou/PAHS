@@ -90,10 +90,13 @@ def triage_with_llm(command: str, *, run_id: str | None = None) -> dict[str, Any
         "complexity_score, complexity_band, needs_research, needs_code, "
         "needs_deep_reasoning, recommended_orchestrator, task_type."
     )
+    from pahs.harness.capability_brief import format_capability_brief_for_prompt
+
+    brief = format_capability_brief_for_prompt(command, worker="triage")
     try:
         text = llm_complete(
             system=system,
-            user=f"Classify this command: {command}",
+            user=f"{brief}\n\nClassify this command: {command}",
             model=_deepseek.chat_model,
             run_id=run_id,
             phase="triage",

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pahs.agents.search_router import route_search_task
-from pahs.planning.task_context import effective_task_prompt
+from pahs.planning.task_context import agent_capability_context, effective_task_prompt
 from pahs.graph.state import PAHSState
 from pahs.providers.router import llm_complete
 from pahs.tools.registry import call_tool
@@ -74,7 +74,8 @@ def searcher_node(state: PAHSState) -> dict:
     # Step 2 — PAHS formats the final milestone answer (do not invent new facts)
     summary = llm_complete(
         system=(
-            "You are PAHS Searcher (step 2 of 2).\n"
+            agent_capability_context(state, worker="searcher")
+            + "\n\nYou are PAHS Searcher (step 2 of 2).\n"
             "Step 1 already ran a web search provider and returned a research draft with sources.\n"
             "Your job:\n"
             "- Produce the FINAL answer for the user's task\n"

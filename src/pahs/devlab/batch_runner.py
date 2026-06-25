@@ -174,12 +174,13 @@ def infer_defects(summary: RunSummary) -> list[str]:
         defects.append(f"plan_warnings: {' | '.join(summary.plan_warnings[:3])}")
     if summary.capability_gaps:
         gap_ids = [
-            str(item.get("id") or item.get("gap_id") or item)
+            str(item.get("code") or item.get("id") or item.get("gap_id") or item)
             if isinstance(item, dict)
             else str(item)
             for item in summary.capability_gaps
         ]
-        defects.append(f"capability_gaps: {', '.join(gap_ids)}")
+        if summary.category != "capability_gap":
+            defects.append(f"capability_gaps: {', '.join(gap_ids)}")
     if summary.category == "capability_gap" and not summary.capability_gaps:
         defects.append("missing_capability_warning: account/publish task without capability gap flag")
     if summary.status in {"AWAITING_REVIEW", "AWAITING_FINAL_FEEDBACK", "ACTIVE"}:

@@ -1,0 +1,15 @@
+{
+  "proposal_id": "prop_20260625_231251_dae3",
+  "run_id": "run_20260625_161251_59d7",
+  "proposal_type": "plan_pattern_update",
+  "status": "pending",
+  "target_path": "standards/learned/plan_patterns/from_feedback.json",
+  "title": "Adjust orchestrator plan pattern from feedback",
+  "feedback_text": "计划应先说明能力边界，对账号类任务给清单而非承诺代操作",
+  "proposed_content": "{\n  \"title\": \"Learned from user feedback\",\n  \"summary\": \"计划应先说明能力边界，对账号类任务给清单而非承诺代操作\",\n  \"source_plan\": {\n    \"intent_summary\": \"帮我开通 B 站视频账号并完成实名\",\n    \"phase_count\": 1,\n    \"task_count\": 1\n  }\n}",
+  "rationale": "Feedback targets plan structure/steps rather than single-agent output.",
+  "reject_reason": null,
+  "pending_file": null,
+  "created_at": "2026-06-25T23:12:51.299077+00:00",
+  "resolved_at": null
+}

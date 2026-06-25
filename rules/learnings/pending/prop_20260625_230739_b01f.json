@@ -1,0 +1,15 @@
+{
+  "proposal_id": "prop_20260625_230739_b01f",
+  "run_id": "run_20260625_160739_a8c7",
+  "proposal_type": "user_standard",
+  "status": "pending",
+  "target_path": "standards/user_preferences.md",
+  "title": "Capture general user preference",
+  "feedback_text": "automated batch smoke test passed; output acceptable",
+  "proposed_content": "- User feedback: automated batch smoke test passed; output acceptable",
+  "rationale": "Generic final feedback captured as a pending standard.",
+  "reject_reason": null,
+  "pending_file": null,
+  "created_at": "2026-06-25T23:07:39.649124+00:00",
+  "resolved_at": null
+}

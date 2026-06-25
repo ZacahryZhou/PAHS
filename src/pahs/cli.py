@@ -513,6 +513,20 @@ def dev_batch(
         report_path.with_suffix(".json"),
     )
 
+    plan_path = None
+    if learner:
+        from pahs.learning.batch_learner import learn_from_batch, write_improvement_plan
+
+        typer.echo("")
+        typer.echo("Running batch Learner analysis...")
+        typer.echo("正在进行批量 Learner 整体分析...")
+        plan = learn_from_batch(result)
+        plan_path = write_improvement_plan(
+            plan,
+            result,
+            report_path.with_name(report_path.stem.replace("dev_batch_report", "dev_batch_improvement_plan") + ".md"),
+        )
+
     completed = sum(1 for item in result.summaries if item.status == "COMPLETED")
     defective = sum(1 for item in result.summaries if item.defects)
     typer.echo("")
@@ -520,8 +534,42 @@ def dev_batch(
     typer.echo(f"完成。成功 {completed}/{runs}，有缺陷 {defective}/{runs}")
     typer.echo(f"Report: {report_path}")
     typer.echo(f"JSON:   {json_path}")
+    if plan_path:
+        typer.echo(f"Plan:   {plan_path}")
+        typer.echo(f"Plan JSON: {plan_path.with_suffix('.json')}")
     typer.echo("")
-    typer.echo("Copy the 'Copy-Paste Handoff' section from the report back to your agent.")
+    if plan_path:
+        typer.echo("Copy the 'Copy-Paste Handoff' section from the Plan file to your Cursor agent.")
+        typer.echo("请打开 Plan 文件，复制「复制给 Cursor」整段给我。")
+    else:
+        typer.echo("Copy the 'Copy-Paste Handoff' section from the report back to your agent.")
+
+
+@app.command("dev-batch-analyze")
+def dev_batch_analyze(
+    json_file: str = typer.Argument(..., help="Path to dev_batch_report_*.json"),
+) -> None:
+    """Re-run batch Learner analysis on an existing batch JSON (no re-test)."""
+    from pathlib import Path
+
+    from pahs.learning.batch_learner import analyze_batch_from_json, write_improvement_plan
+
+    path = Path(json_file)
+    if not path.exists():
+        typer.echo(f"File not found: {path}", err=True)
+        raise typer.Exit(code=1)
+
+    db.init_db()
+    result, plan = analyze_batch_from_json(path)
+    plan_path = write_improvement_plan(
+        plan,
+        result,
+        path.with_name(path.stem.replace("dev_batch_report", "dev_batch_improvement_plan") + ".md"),
+    )
+    typer.echo(f"Improvement plan: {plan_path}")
+    typer.echo(f"Plan JSON: {plan_path.with_suffix('.json')}")
+    typer.echo(f"Batch proposals: {len(plan.rule_proposals)}")
+    typer.echo("Copy 'Copy-Paste Handoff' from the plan file to Cursor.")
 
 
 @app.command("dev-ui")

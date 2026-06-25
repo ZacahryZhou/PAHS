@@ -78,11 +78,26 @@
       position: relative;
     }
     .resizer:hover, .resizer.dragging { background: #a1a1aa; }
-    .resizer::after {
-      content: "";
-      position: absolute;
-      inset: 0 -4px;
+    .resizer::after { content: ""; position: absolute; inset: 0 -4px; }
+
+    .graph-stack {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      overflow: hidden;
     }
+    .resizer-h {
+      height: 5px;
+      cursor: row-resize;
+      background: var(--border);
+      flex-shrink: 0;
+      transition: background .15s;
+      position: relative;
+    }
+    .resizer-h:hover, .resizer-h.dragging { background: #a1a1aa; }
+    .resizer-h::after { content: ""; position: absolute; inset: -4px 0; }
+
     .graph-panel {
       flex: 1;
       min-width: 340px;
@@ -211,7 +226,7 @@
 
     #graph-wrap {
       flex: 1;
-      min-height: 180px;
+      min-height: 100px;
       overflow: auto;
       padding: 12px;
       background: linear-gradient(180deg, #fafafa 0%, var(--bg) 100%);
@@ -219,12 +234,10 @@
     #arch-svg { width: 100%; min-width: 380px; height: auto; display: block; }
 
     #node-detail {
-      flex: 0 0 38%;
-      min-height: 160px;
-      max-height: 45%;
+      flex: 0 0 32%;
+      min-height: 88px;
       display: flex;
       flex-direction: column;
-      border-top: 1px solid var(--border);
       background: var(--surface);
       box-shadow: 0 -4px 16px rgba(0,0,0,.04);
     }
@@ -239,6 +252,24 @@
     }
     .detail-head h3 { margin: 0; font-size: 0.88rem; font-weight: 650; }
     .detail-head .badge {
+      font-size: 0.68rem;
+      padding: 3px 8px;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: var(--muted);
+      font-weight: 600;
+    }
+    .detail-head .expand-btn {
+      font-size: 0.68rem;
+      padding: 4px 10px;
+      border-radius: 6px;
+      background: var(--accent-soft);
+      border: 1px solid var(--border);
+      cursor: pointer;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .detail-head .expand-btn:hover { background: #e4e4e7; }
       font-size: 0.68rem;
       padding: 3px 8px;
       border-radius: 999px;
@@ -292,7 +323,58 @@
       max-height: 120px;
       overflow-y: auto;
     }
+    .event-row pre.expanded { max-height: none; }
     .event-row.err { border-left-color: var(--fail); }
+
+    .modal-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.4);
+      z-index: 200;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      backdrop-filter: blur(2px);
+    }
+    .modal-backdrop.open { display: flex; }
+    .modal {
+      background: var(--surface);
+      border-radius: 14px;
+      box-shadow: 0 20px 60px rgba(0,0,0,.18);
+      max-width: 720px;
+      width: 100%;
+      max-height: 85vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .modal header {
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: var(--surface);
+    }
+    .modal header h2 { margin: 0; font-size: 1rem; font-weight: 650; }
+    .modal-close {
+      background: var(--accent-soft);
+      border: none;
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      font-size: 1.2rem;
+      cursor: pointer;
+      line-height: 1;
+    }
+    .modal-close:hover { background: #e4e4e7; }
+    .modal-body {
+      padding: 16px 18px;
+      overflow-y: auto;
+      font-size: 0.85rem;
+      line-height: 1.55;
+    }
 
     /* SVG nodes */
     .g-node rect { stroke: #d4d4d8; stroke-width: 1.5; fill: #fff; transition: all .18s ease; }
@@ -346,23 +428,39 @@
     <section class="graph-panel" id="graph-panel">
       <div class="panel-head">
         架构流程
-        <span class="hint">点击节点查看任务详情</span>
+        <span class="hint">点击节点打开详情弹窗</span>
       </div>
       <div class="path-legend">
         <span class="on">Path A · LangGraph</span>
         <span>Path B · Telegram 直达</span>
       </div>
-      <div id="graph-wrap">
-        <svg id="arch-svg" viewBox="0 0 820 720" xmlns="http://www.w3.org/2000/svg"></svg>
-      </div>
-      <div id="node-detail" class="empty">
-        <div class="detail-head">
-          <h3 id="detail-title">节点详情</h3>
-          <span class="badge" id="detail-badge">—</span>
+      <div class="graph-stack" id="graph-stack">
+        <div id="graph-wrap">
+          <svg id="arch-svg" viewBox="0 0 820 720" xmlns="http://www.w3.org/2000/svg"></svg>
         </div>
-        <div class="detail-body" id="detail-body">点击架构图中的任意节点，查看该步骤的任务与事件日志。</div>
+        <div class="resizer-h" id="resizer-h" title="拖动调整上下高度"></div>
+        <div id="node-detail" class="empty">
+          <div class="detail-head">
+            <h3 id="detail-title">节点详情</h3>
+            <div style="display:flex;gap:6px;align-items:center">
+              <span class="badge" id="detail-badge">—</span>
+              <button type="button" class="expand-btn" id="detail-expand" style="display:none">弹窗查看</button>
+            </div>
+          </div>
+          <div class="detail-body" id="detail-body">点击架构图中的任意节点，查看该步骤的任务与事件日志。</div>
+        </div>
       </div>
     </section>
+  </div>
+
+  <div class="modal-backdrop" id="modal">
+    <div class="modal">
+      <header>
+        <h2 id="modal-title">节点详情</h2>
+        <button type="button" class="modal-close" id="modal-close" aria-label="关闭">×</button>
+      </header>
+      <div class="modal-body" id="modal-body"></div>
+    </div>
   </div>
 
   <script>
@@ -383,6 +481,13 @@
     const detailBadge = document.getElementById("detail-badge");
     const detailBody = document.getElementById("detail-body");
     const resizer = document.getElementById("resizer");
+    const resizerH = document.getElementById("resizer-h");
+    const graphWrap = document.getElementById("graph-wrap");
+    const graphStack = document.getElementById("graph-stack");
+    const modal = document.getElementById("modal");
+    const modalTitle = document.getElementById("modal-title");
+    const modalBody = document.getElementById("modal-body");
+    const detailExpand = document.getElementById("detail-expand");
 
     let currentRunId = null;
     let eventSource = null;
@@ -390,8 +495,9 @@
     let lastProgress = null;
     let lastShownError = "";
     let selectedNodeId = null;
+    let hDragging = false;
 
-    /* —— resizable split —— */
+    /* —— horizontal resizer (left/right) —— */
     let dragging = false;
     resizer.addEventListener("mousedown", (e) => {
       dragging = true;
@@ -401,19 +507,48 @@
       e.preventDefault();
     });
     document.addEventListener("mousemove", (e) => {
-      if (!dragging) return;
-      const ws = document.getElementById("workspace");
-      const rect = ws.getBoundingClientRect();
-      const pct = ((e.clientX - rect.left) / rect.width) * 100;
-      chatPanel.style.flex = `0 0 ${Math.min(72, Math.max(28, pct))}%`;
+      if (dragging) {
+        const ws = document.getElementById("workspace");
+        const rect = ws.getBoundingClientRect();
+        const pct = ((e.clientX - rect.left) / rect.width) * 100;
+        chatPanel.style.flex = `0 0 ${Math.min(72, Math.max(28, pct))}%`;
+      }
+      if (hDragging) {
+        const rect = graphStack.getBoundingClientRect();
+        const pct = ((e.clientY - rect.top) / rect.height) * 100;
+        graphWrap.style.flex = `0 0 ${Math.min(78, Math.max(22, pct))}%`;
+        detailPanel.style.flex = "1";
+      }
     });
     document.addEventListener("mouseup", () => {
-      if (!dragging) return;
-      dragging = false;
-      resizer.classList.remove("dragging");
-      document.body.style.cursor = "";
-      document.body.style.userSelect = "";
+      if (dragging) {
+        dragging = false;
+        resizer.classList.remove("dragging");
+      }
+      if (hDragging) {
+        hDragging = false;
+        resizerH.classList.remove("dragging");
+      }
+      if (!dragging && !hDragging) {
+        document.body.style.cursor = "";
+        document.body.style.userSelect = "";
+      }
     });
+
+    resizerH.addEventListener("mousedown", (e) => {
+      hDragging = true;
+      resizerH.classList.add("dragging");
+      document.body.style.cursor = "row-resize";
+      document.body.style.userSelect = "none";
+      e.preventDefault();
+    });
+
+    document.getElementById("modal-close").onclick = () => modal.classList.remove("open");
+    modal.onclick = (e) => { if (e.target === modal) modal.classList.remove("open"); };
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") modal.classList.remove("open");
+    });
+    detailExpand.onclick = () => { if (selectedNodeId) openNodeModal(selectedNodeId); };
 
     function isArchQuery(t) {
       return /^(目前)?架构$|^architecture$|^流程$/i.test(t.trim());
@@ -486,20 +621,16 @@
       return out;
     }
 
-    function renderNodeDetail(nodeId) {
-      selectedNodeId = nodeId;
-      if (!lastProgress) return;
-
+    function buildNodeDetailHtml(nodeId, full) {
+      if (!lastProgress) return "";
       const node = (lastProgress.nodes || []).find((n) => n.id === nodeId);
       const events = (lastProgress.node_details || {})[nodeId] || [];
       const plan = lastProgress.snapshot && lastProgress.snapshot.execution_plan;
-      const st = node ? node.status : "pending";
-
-      detailPanel.classList.remove("empty");
-      detailTitle.textContent = node ? node.label : nodeId;
-      detailBadge.textContent = (node && node.sublabel) ? node.sublabel : st;
-
       let html = "";
+
+      if (node) {
+        html += `<p style="margin:0 0 10px;font-size:0.75rem;color:var(--muted)">状态: <strong>${escapeHtml(node.status)}</strong> · 层级: ${escapeHtml(node.sublabel || node.id)}</p>`;
+      }
 
       if (nodeId === "orchestrator_plan" && plan) {
         html += `<div style="font-weight:650;margin-bottom:8px">📋 任务表 ExecutionPlan</div>`;
@@ -509,14 +640,15 @@
         const tasks = tasksForWorker(plan, worker);
         html += `<div style="font-weight:650;margin-bottom:8px">Worker: ${escapeHtml(worker)}</div>`;
         if (tasks.length) {
-          tasks.forEach(({ task }) => {
+          tasks.forEach(({ phase, task }) => {
             html += `<div class="task-card">
-              <div class="row"><span class="tag tool">${escapeHtml(task.tool || "—")}</span></div>
+              <div class="row"><span class="tag tool">${escapeHtml(task.tool || "—")}</span><span style="font-size:0.68rem;color:var(--muted)">${escapeHtml(phase.id)}</span></div>
               <div class="goal">${escapeHtml(task.goal)}</div>
+              ${task.external_agent ? `<div style="font-size:0.72rem;margin-top:4px;color:var(--muted)">external: ${escapeHtml(task.external_agent)}</div>` : ""}
             </div>`;
           });
         } else {
-          html += `<p style="color:var(--muted)">任务表中暂无 ${escapeHtml(worker)} 任务</p>`;
+          html += `<p style="color:var(--muted)">当前任务表未分配 <strong>${escapeHtml(worker)}</strong> 任务。<br>本次运行可能走了其他 Worker 分支。</p>`;
         }
       } else if (nodeId === "triage_score") {
         const ev = events.find((e) => e.event_type === "triage_routing");
@@ -524,13 +656,16 @@
           const rc = ev.payload.routing_context || ev.payload;
           html += `<div class="task-card">
             <div class="row"><span class="tag">${escapeHtml(rc.worker || ev.payload.worker || "?")}</span></div>
-            <div class="goal">任务类型: ${escapeHtml(rc.task_type || ev.payload.task_type || "?")}<br>复杂度: ${escapeHtml(rc.complexity_band || "?")}</div>
+            <div class="goal">任务类型: ${escapeHtml(rc.task_type || ev.payload.task_type || "?")}<br>复杂度: ${escapeHtml(rc.complexity_band || "?")}<br>需要调研: ${rc.needs_research ? "是" : "否"}</div>
           </div>`;
         }
       } else if (nodeId === "execute_plan_phase") {
-        const ev = events.filter((e) => e.event_type === "plan_phase_executed");
-        ev.forEach((e) => {
-          html += `<div class="task-card"><div class="goal">Phase ${escapeHtml(e.payload.phase_id || "")} · workers: ${escapeHtml((e.payload.workers || []).join(", "))}</div></div>`;
+        events.filter((e) => e.event_type === "plan_phase_executed").forEach((e) => {
+          html += `<div class="task-card"><div class="goal">Phase <strong>${escapeHtml(e.payload.phase_id || "")}</strong><br>workers: ${escapeHtml((e.payload.workers || []).join(", "))}<br>tasks: ${escapeHtml((e.payload.task_ids || []).join(", "))}</div></div>`;
+        });
+      } else if (nodeId === "verify_pipeline") {
+        events.filter((e) => e.event_type.includes("validation")).forEach((e) => {
+          html += `<div class="task-card"><div class="goal">${escapeHtml(e.summary || e.event_type)}</div></div>`;
         });
       }
 
@@ -541,15 +676,36 @@
           html += `<div class="event-row${err ? " err" : ""}">
             <div class="time">${escapeHtml((e.created_at || "").replace("T"," ").slice(0,19))} · ${escapeHtml(e.event_type)}</div>
             <div class="sum">${escapeHtml(e.summary || "")}</div>
-            ${e.payload && Object.keys(e.payload).length ? `<pre>${escapeHtml(JSON.stringify(e.payload, null, 2))}</pre>` : ""}
+            ${e.payload && Object.keys(e.payload).length ? `<pre class="${full ? "expanded" : ""}">${escapeHtml(JSON.stringify(e.payload, null, 2))}</pre>` : ""}
           </div>`;
         });
       } else if (!html) {
         html = `<p style="color:var(--muted)">该节点尚未执行或无事件记录。<br>发送命令开始运行后可查看详情。</p>`;
       }
+      return html;
+    }
 
-      detailBody.innerHTML = html;
+    function openNodeModal(nodeId) {
+      selectedNodeId = nodeId;
+      const node = lastProgress && (lastProgress.nodes || []).find((n) => n.id === nodeId);
+      modalTitle.textContent = node ? `${node.label} · ${node.sublabel || ""}` : nodeId;
+      modalBody.innerHTML = buildNodeDetailHtml(nodeId, true);
+      modal.classList.add("open");
       renderGraph(lastProgress);
+    }
+
+    function renderNodeDetail(nodeId, openModal) {
+      selectedNodeId = nodeId;
+      if (!lastProgress) return;
+
+      const node = (lastProgress.nodes || []).find((n) => n.id === nodeId);
+      detailPanel.classList.remove("empty");
+      detailTitle.textContent = node ? node.label : nodeId;
+      detailBadge.textContent = (node && node.sublabel) ? node.sublabel : (node ? node.status : "—");
+      detailBody.innerHTML = buildNodeDetailHtml(nodeId, false);
+      detailExpand.style.display = "inline-block";
+      renderGraph(lastProgress);
+      if (openModal) openNodeModal(nodeId);
     }
 
     function applyProgress(data) {
@@ -561,9 +717,9 @@
         runLabel.textContent = data.snapshot.run_id || currentRunId || "idle";
         setStatus(data.snapshot.status || data.run_status);
         setReviewMode(data.snapshot);
-        if (selectedNodeId) renderNodeDetail(selectedNodeId);
+        if (selectedNodeId) renderNodeDetail(selectedNodeId, false);
         else if (data.snapshot.execution_plan && data.snapshot.execution_plan.phases) {
-          renderNodeDetail("orchestrator_plan");
+          renderNodeDetail("orchestrator_plan", false);
         }
         if (data.snapshot.status === "FAILED") sendBtn.disabled = false;
       }
@@ -606,8 +762,8 @@
       svg.innerHTML = svgHtml;
       svg.querySelectorAll(".g-node").forEach((g) => {
         const id = g.getAttribute("data-id");
-        g.onclick = () => renderNodeDetail(id);
-        g.onkeydown = (e) => { if (e.key === "Enter") renderNodeDetail(id); };
+        g.onclick = () => renderNodeDetail(id, true);
+        g.onkeydown = (e) => { if (e.key === "Enter") renderNodeDetail(id, true); };
       });
     }
 
@@ -660,7 +816,7 @@
       if (!text) return;
       if (isArchQuery(text)) {
         addMessage("user", text);
-        addMessage("assistant", "右侧为 LangGraph 完整流程图。\n点击任意节点可查看该步骤的任务详情与事件日志。\n拖动中间分隔条可调整左右宽度。");
+        addMessage("assistant", "右侧为 LangGraph 流程图。\n· 点击节点 → 弹窗查看完整详情\n· 拖动中间竖条调整左右宽度\n· 拖动架构图下方横条调整上下高度");
         inputEl.value = "";
         loadArchitecture();
         return;
@@ -698,7 +854,7 @@
     };
 
     loadArchitecture().catch((e) => addMessage("error", "初始化失败: " + e.message));
-    addMessage("system", "拖动中间竖条调整宽度 · 点击架构节点查看任务详情");
+    addMessage("system", "拖动竖条调左右 · 拖动横条调上下 · 点击节点打开详情弹窗");
   </script>
 </body>
 </html>

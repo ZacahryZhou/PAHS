@@ -2,12 +2,12 @@
 
 **Personal Agent Harness System**
 
-A private, personal multi-agent assistant built with **LangGraph**, a **Harness governance layer**, and **human-in-the-loop** review at every important stage.
+A private, personal multi-agent assistant built with **LangGraph**, an **Orchestrator-driven execution plan**, a **Harness governance layer**, and **human-in-the-loop** review.
 
-**个人专属多智能体助理系统** — 基于 **LangGraph** 编排、**Harness 四层治理**，并在关键阶段引入**人工审核**与**反馈学习**。
+**个人专属多智能体助理系统** — 基于 **LangGraph** 编排、**Orchestrator 任务表**、**Harness 四层治理**，关键阶段引入**人工审核**与**反馈学习**。
 
 [![Repository](https://img.shields.io/badge/repo-GitHub-blue)](https://github.com/ZacahryZhou/PAHS)
-[![Status](https://img.shields.io/badge/status-architecture%20%26%20planning-yellow)](docs/ROADMAP.md)
+[![Status](https://img.shields.io/badge/status-active%20development-green)](docs/ROADMAP.md)
 [![LangGraph](https://img.shields.io/badge/orchestration-LangGraph-purple)](docs/ARCHITECTURE.md)
 
 ---
@@ -15,20 +15,20 @@ A private, personal multi-agent assistant built with **LangGraph**, a **Harness 
 ## Table of Contents | 目录
 
 - [Overview | 项目概述](#overview--项目概述)
-- [Why PAHS | 为什么做 PAHS](#why-pahs--为什么做-pahs)
-- [Core Concepts | 核心概念](#core-concepts--核心概念)
 - [Architecture | 系统架构](#architecture--系统架构)
-- [Agents & Modes | Agent 与模式](#agents--modes--agent-与模式)
+- [Two Entry Paths | 两条入口路径](#two-entry-paths--两条入口路径)
+- [Orchestrator & ExecutionPlan | 编排与任务表](#orchestrator--executionplan--编排与任务表)
+- [Routing & Scoring | 三套判断机制](#routing--scoring--三套判断机制)
+- [Agents & External Tools | Agent 与外部工具](#agents--external-tools--agent-与外部工具)
 - [Harness Layers | Harness 四层](#harness-layers--harness-四层)
-- [End-to-End Flow | 完整流程](#end-to-end-flow--完整流程)
+- [LangGraph Flow | 完整节点流](#langgraph-flow--完整节点流)
 - [Cross-Channel Review | 跨通道审核](#cross-channel-review--跨通道审核)
 - [Feedback & Learning | 反馈与学习](#feedback--learning--反馈与学习)
-- [Builder Safety | Builder 安全机制](#builder-safety--builder-安全机制)
 - [Tech Stack | 技术栈](#tech-stack--技术栈)
 - [Project Structure | 项目结构](#project-structure--项目结构)
 - [Configuration | 配置说明](#configuration--配置说明)
-- [Development Roadmap | 开发路线](#development-roadmap--开发路线)
 - [Getting Started | 快速开始](#getting-started--快速开始)
+- [CLI Reference | 常用命令](#cli-reference--常用命令)
 - [Documentation | 文档索引](#documentation--文档索引)
 - [Design Principles | 设计原则](#design-principles--设计原则)
 
@@ -38,372 +38,268 @@ A private, personal multi-agent assistant built with **LangGraph**, a **Harness 
 
 **EN**
 
-PAHS is a **personal AI operating system** — not a generic chatbot. You send a command from **CLI**, **Telegram**, or **WhatsApp**. The system:
+PAHS is a **personal AI operating system** — not a generic chatbot. You send a command from **CLI** or **Telegram**. The system:
 
 1. Creates a tracked **Run** with a unique `run_id`
-2. **Triages** task difficulty and routes to **Orchestrator Lite** or **Orchestrator Full**
-3. Executes work through specialized **Agents** and **Executor Modes**
-4. Validates output through a layered **Harness** (rules, tools, validation, environment)
-5. Pauses for your **milestone review** when needed
-6. Collects **final feedback** after the whole run and lets **Learner** propose improvements — never auto-applied
-7. Can **build new tools** via Builder, but only after tests and **manual approval**
+2. **Triages** task difficulty (context for planning)
+3. **Orchestrator** reads the project capability catalog and writes an internal **ExecutionPlan** (phases + tasks) — stored in `plan_json`, not shown to the user by default
+4. **Harness** validates the plan, loads rules, checks budget, and executes each **Phase** (tasks can run **in parallel** within a phase)
+5. Specialized **Agents** (Searcher, Creator, Executor) and **external tools** (SMAS, PIP) execute tasks; outputs flow through **artifacts** to downstream tasks
+6. Pauses for **milestone review** between phases when configured
+7. Collects **final feedback**; **Learner** proposes improvements to rules, standards, and **plan patterns** — never auto-applied
 
 **中文**
 
-PAHS 是一个**个人 AI 操作系统**，不是普通聊天机器人。你通过 **CLI**、**Telegram** 或 **WhatsApp** 下达指令后，系统会：
+PAHS 是一个**个人 AI 操作系统**。你通过 **CLI** 或 **Telegram** 下指令后：
 
-1. 为每次任务创建带唯一 **`run_id`** 的 **Run（运行实例）**
-2. 通过 **Triage（分诊）** 评估难度，路由到 **Orchestrator Lite** 或 **Orchestrator Full**
-3. 由专职 **Agent** 与 **Executor 模式** 执行具体工作
-4. 经 **Harness 四层**（规则 / 工具 / 验证 / 环境）治理每一次执行
-5. 在关键节点 **暂停，等待你的阶段审核**
-6. 整单结束后收集 **总反馈**，由 **Learner** 生成改进提案 — **永不自动生效**
-7. 可通过 **Builder** 创造新工具，但必须经测试与 **人工批准** 才能投产
+1. 创建带 **`run_id`** 的 **Run**
+2. **Triage** 粗分类（为编排提供上下文）
+3. **Orchestrator** 读取能力清单，生成内部 **ExecutionPlan**（阶段 + 任务表），存入 `plan_json`，**默认不展示给用户**
+4. **Harness** 校验计划、加载规则、预算预检，按 **Phase** 执行（阶段内 Task 可**并行**）
+5. **Agent 团队**与**外部工具**（SMAS / PIP）按任务表执行；产出经 **artifacts** 传给下游
+6. 按策略在阶段间 **暂停人工审核**
+7. 收集 **总反馈**；**Learner** 优化 rules / standards / **plan_patterns** — **永不自动生效**
 
-> **Current status | 当前状态:** Architecture and roadmap are defined. Week 1 implementation (LangGraph core + CLI) is the next step.  
-> **当前进度：** 架构与开发路线已确定，下一步是实现第 1 周（LangGraph 核心 + CLI）。
-
----
-
-## Why PAHS | 为什么做 PAHS
-
-| Problem | PAHS Approach |
-|---------|---------------|
-| Single LLM for everything is expensive and inconsistent | **Multi-model routing** — right model per task (DeepSeek, Claude, GPT-4o, Kimi) |
-| Agents run unchecked | **Harness governance** on every step |
-| Hard to know what "done" means | **Milestone review** + **standards** learned from your feedback |
-| Tool creation is risky | **Builder staging** — test first, approve before production |
-| Chat history ≠ task state | Central **`run_id`** + SQLite state across all channels |
-
-| 问题 | PAHS 方案 |
-|------|-----------|
-| 一个模型包打天下，贵且不稳定 | **多模型路由** — 按任务选模型 |
-| Agent 执行无人把关 | 每步经过 **Harness 四层治理** |
-| 「做好了吗」标准模糊 | **阶段审核** + 从你的反馈沉淀 **standards** |
-| 自动造工具有风险 | **Builder 样品区** — 先测试，你批准才上线 |
-| 聊天记录 ≠ 任务状态 | 统一 **`run_id`** + SQLite 跨通道状态 |
-
----
-
-## Core Concepts | 核心概念
-
-### Run
-
-**EN:** One full user request from start to finish.  
-**中文：** 从你下指令到任务结束的完整过程。
-
-Example | 示例:
-> "Research LangGraph checkpointing and write Chinese notes to ~/notes"
-
----
-
-### `run_id`
-
-**EN:** The unique tracking ID for one Run — like an order number or ticket ID.  
-**中文：** 一次 Run 的唯一追踪编号，类似订单号或工单号。
-
-```text
-run_20260624_155900_a3f9
-```
-
-It connects | 它关联：
-
-| English | 中文 |
-|---------|------|
-| Original command | 原始指令 |
-| Current milestone | 当前阶段 |
-| Pending review | 待审核内容 |
-| LangGraph checkpoint (resume point) | 断点恢复位置 |
-| Feedback and costs | 反馈与成本 |
-| Replies from CLI / Telegram / WhatsApp | 各通道的回复 |
-
-> A task started in Telegram can be approved from CLI — as long as both reference the same `run_id`.  
-> 在 Telegram 发起的任务，可以在 CLI 审核 — 只要使用同一个 `run_id`。
-
----
-
-### Milestone
-
-**EN:** One reviewable stage inside a Run.  
-**中文：** Run 内部的一个可审核阶段。
-
-```text
-Milestone 1: research summary      → 调研摘要
-Milestone 2: outline               → 大纲
-Milestone 3: final file saved      → 终稿存盘
-Final: your overall feedback       → 你的总反馈
-```
-
----
-
-### Agent vs Mode
-
-| Type | English | 中文 | Examples |
-|------|---------|------|----------|
-| **Agent** | Stable role with own rules, tools, model | 有固定角色、规则、工具的 Agent | Orchestrator, Creator, Searcher, Learner, Builder |
-| **Mode** | Execution profile inside Executor — not a separate agent | Executor 内的执行模式，非独立 Agent | `DEEP_THINK`, `CODE`, `ANALYSIS` |
+> **Current status | 当前状态:** Orchestrator + ExecutionPlan + plan-driven LangGraph execution are implemented. Search Router (smart Tavily/Perplexity) is live. Triage / Step Router **scoring** is planned for a final pass. Telegram IG/video still uses a **direct shortcut** (Path B) alongside the full LangGraph path (Path A).
 
 ---
 
 ## Architecture | 系统架构
 
+### System panorama | 系统全景
+
 ```mermaid
 flowchart TB
-    subgraph channels["Channel Layer | 入口层"]
-        CLI[CLI]
-        TG[Telegram]
-        WA[WhatsApp]
+    USER((用户))
+
+    subgraph ENTRY["入口层"]
+        TG["Telegram<br/>pah telegram"]
+        CLI["CLI<br/>pah run / pah reply"]
     end
 
-    subgraph gateway["Channel Gateway | 统一网关"]
-        USER[Unified user_id]
-        RQ[review_queue]
-        RESUME[Resume by run_id]
+    subgraph PATH_A["Path A — 完整团队 LangGraph"]
+        LG["LangGraph 主编排"]
+        ORCH["Orchestrator<br/>ExecutionPlan"]
+        HARNESS["Harness<br/>Rules / Budget / Verify"]
+        TEAM["Agent 团队<br/>按 Plan 执行"]
     end
 
-    subgraph triage["Triage | 分诊层"]
-        TRIAGE[Triage Agent]
-        LITE[Orchestrator Lite]
-        FULL[Orchestrator Full]
+    subgraph PATH_B["Path B — Telegram 快捷直达"]
+        IR["intent_router"]
+        DT["direct_tools"]
+        SMAS["SMAS · IG 图文"]
+        PIP["PIP · 短视频"]
     end
 
-    subgraph harness["Harness | 治理层"]
-        RU[Rules 规则]
-        TO[Tools 工具]
-        VE[Validation 验证]
-        EN[Environment 环境]
+    subgraph STORE["存储 & 学习"]
+        DB[("SQLite<br/>plan_json · artifacts")]
+        LR["Learner<br/>plan_patterns"]
     end
 
-    subgraph workers["Execution | 执行层"]
-        CR[Creator]
-        SE[Searcher]
-        EX[Executor Modes]
-    end
+    USER --> TG & CLI
+    TG -->|"IG / 视频关键词"| PATH_B
+    TG -->|"run / reply"| PATH_A
+    CLI --> PATH_A
 
-    subgraph meta["Meta | 元能力"]
-        LE[Learner]
-        BU[Builder → Staging]
-    end
-
-    subgraph store["Storage | 存储"]
-        SQL[(SQLite)]
-        STD[standards/]
-    end
-
-    CLI & TG & WA --> gateway
-    gateway --> TRIAGE
-    TRIAGE -->|simple 简单| LITE
-    TRIAGE -->|complex 复杂| FULL
-    LITE & FULL --> harness
-    harness --> CR & SE & EX
-    CR & SE & EX --> VE
-    VE --> LITE & FULL
-    LITE & FULL --> gateway
-    gateway --> CLI & TG & WA
-    LITE & FULL -.-> LE
-    BU --> STAGING[staging/]
-    LE --> STD
-    gateway & LE --> SQL
+    PATH_B --> IR --> DT --> SMAS & PIP --> USER
+    PATH_A --> LG --> ORCH --> HARNESS --> TEAM --> USER
+    ORCH & TEAM --> DB
+    USER -->|总反馈| LR --> DB
+    LR -.->|下次优化 Plan| ORCH
 ```
 
-For the full architecture specification, see [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).  
-完整架构说明见 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)。
+### Layer model | 分层模型
+
+| Layer | 职责 | 关键模块 |
+|-------|------|----------|
+| **入口 Gateway** | 统一消息、run_id、跨通道 resume | `gateway/service.py`, `telegram_adapter.py` |
+| **编排 Orchestrator** | 发任务表：几步、谁干、用什么工具 | `planning/orchestrator_planner.py` |
+| **校验 Step Router** | 计划结构合法（工具/agent/依赖） | `planning/step_router.py` |
+| **治理 Harness** | 规则、预算、验证、环境 | `harness/` |
+| **执行 Agents** | Searcher / Creator / Executor / External | `agents/`, `external/` |
+| **子路由 Search Router** | Search 步：Tavily vs Perplexity | `agents/search_router.py` |
+| **学习 Learner** | 反馈 → rules / plan_patterns | `learning/learner.py` |
 
 ---
 
-## Agents & Modes | Agent 与模式
+## Two Entry Paths | 两条入口路径
 
-### Agents | 常驻 Agent
+| | **Path A — 完整流程** | **Path B — Telegram 直达** |
+|---|------------------------|------------------------------|
+| **触发** | `pah run "..."` / Telegram `run ...` / `reply` | Telegram 自然语言（IG、视频等关键词） |
+| **经过 Orchestrator?** | ✅ 是 | ❌ 否（`intent_router` → `direct_tools`） |
+| **适用** | 调研、多步、代码、复杂任务 | 快速出 IG 图文 / 短视频 |
+| **人工审核** | LangGraph milestone interrupt | SMAS：`好` / `改：…` |
 
-| Agent | Role (EN) | 职责（中文） | Default Model |
-|-------|-----------|--------------|---------------|
-| **Triage** | Score difficulty, route Lite/Full | 评估难度，分流 Lite/Full | DeepSeek V3 |
-| **Orchestrator Lite** | Fast planning for simple tasks | 简单任务快速规划 | DeepSeek V3 |
-| **Orchestrator Full** | Multi-milestone planning, monitoring | 多阶段规划与监控 | DeepSeek V3 (+ R1 when needed) |
-| **Creator** | Content: posts, reports, scripts | 内容生成：文案、报告、脚本 | DeepSeek V3 / GPT-4o / Claude |
-| **Searcher** | Web research, source gathering | 搜索调研、整理来源 | DeepSeek V3 + Tavily |
-| **Learner** | Learn from final feedback (async) | 从总反馈学习（异步） | DeepSeek V3 |
-| **Builder** | Generate tools in staging only | 仅在样品区生成工具 | Claude Sonnet |
+Path B 未来计划并入 Orchestrator；当前两条路径并存。
 
-### Executor Modes | 执行模式
+---
 
-Used for complex tasks without maintaining separate agent personas.  
-用于困难任务，无需维护独立 Agent 人格。
+## Orchestrator & ExecutionPlan | 编排与任务表
 
-| Mode | When | 何时使用 | Capability |
-|------|------|----------|------------|
-| `DEEP_THINK` | Hard reasoning, planning | 深度推理、方案设计 | DeepSeek R1 |
-| `CODE` | Code, shell, file I/O | 代码、终端、文件 | DeepSeek V3 / Kimi |
-| `ANALYSIS` | Data, CSV, charts | 数据、图表、指标 | Python + DeepSeek V3 |
+Orchestrator 是**发令者**：读用户命令 + 能力清单 + 历史 `plan_patterns`，写出内部任务表。
+
+```text
+ExecutionPlan
+├── intent_summary          # 任务摘要（内部）
+├── complexity_band         # simple | medium | complex
+├── review_policy           # per_phase | final_only
+└── phases[]
+    ├── phase_1  parallel=true   # 阶段内可共行
+    │   ├── task t1  searcher
+    │   └── task t2  searcher
+    ├── phase_2  depends_on: [phase_1]
+    │   └── task t3  creator  inputs_from: [t1, t2]
+    └── phase_3
+        └── task t4  external/smas  inputs_from: [t3]
+```
+
+- **Plan 存哪：** `runs.plan_json` + graph state `execution_plan` / `plan_artifacts`
+- **往下传：** 每个 task 的 output 写入 `plan_artifacts[task_id]`，下游通过 `inputs_from` 读取
+- **预览（不执行）：** `pah plan-preview "你的命令"`
+
+**能力清单来源：** `config/external_agents.yaml`（SMAS、PIP）+ `harness/tools.py`（search_web、run_python 等）
+
+---
+
+## Routing & Scoring | 三套判断机制
+
+三套机制**分工不同**，按流程**依次触发**（不是同时打分）：
+
+| # | 机制 | 何时跑 | 决定什么 | 状态 |
+|---|------|--------|----------|------|
+| ① | **Triage** | 每次 `pah run` 开头 | 粗分类、complexity、Orchestrator 上下文 | 打分 **待最后统一改** |
+| ② | **Step Router** | Orchestrator 出 plan 后 | plan 是否合法（工具/依赖） | 仅结构校验；打分 **待最后改** |
+| ③ | **Search Router** | Searcher task 执行时 | Tavily vs Perplexity（五维：实时/准确/深度/权威/多源） | ✅ **已完成** |
+
+```text
+用户输入 → ① Triage → Orchestrator 写 Plan → ② Step Router 校验
+         → 按 Plan 执行 → Searcher task 时 → ③ Search Router
+```
+
+---
+
+## Agents & External Tools | Agent 与外部工具
+
+### Internal workers | 内部 Agent
+
+| Worker | 职责 | 工具 / 模式 |
+|--------|------|-------------|
+| **Searcher** | 调研、查最新、对比 | `search_web` → Search Router → Step 2 DeepSeek 润色 |
+| **Creator** | 文案、报告、解释 | `generate_content` / DeepSeek |
+| **Executor** | 代码、分析、深度推理 | `CODE` / `ANALYSIS` / `DEEP_THINK` |
+
+### External tools | 外部工具（子项目）
+
+| Tool | 项目 | 用途 | 配置 |
+|------|------|------|------|
+| **SMAS** | `~/Desktop/SMAS` | Instagram / 图文生成 + 预览图 | `config/external_agents.yaml` |
+| **PIP** | `~/Desktop/PIP` | 短视频生成 | 同上 |
+
+External 既可出现在 **ExecutionPlan** 的 task 里（Path A），也可被 Telegram **直达**（Path B）。
+
+### Executor modes | 执行模式
+
+| Mode | 何时 | 能力 |
+|------|------|------|
+| `DEEP_THINK` | 深度推理 | deepseek-reasoner |
+| `CODE` | 代码、文件 | `run_python`, `read_file`, `write_file` |
+| `ANALYSIS` | 数据、图表 | Python sandbox + 解读 |
 
 ---
 
 ## Harness Layers | Harness 四层
 
-Every execution passes through four governance layers.  
-每一次执行都经过四层治理。
+每一次 Phase 执行都经过 Harness：
 
-| Layer | EN | 中文 | What it does |
-|-------|----|------|--------------|
-| **Rule** | How things should be done | 知道该怎么做 | Lazy-loaded rules from `rules/` — global always, agent/mode on demand |
-| **Tool** | How to call capabilities | 知道如何调用工具 | Approved tools only; staging tools invisible to Orchestrator |
-| **Validation** | Is this output reasonable? | 结果是否合理？ | Stage 1 rules → Stage 1.5 heuristics → Stage 2 LLM (gray area only) → your review |
-| **Environment** | Context OK? Cost OK? | 环境是否正确？成本是否可控？ | Token/cost budget, model downgrade, timeout, no-progress detection |
-
-### Rule loading strategy | 规则加载策略
+| Layer | 中文 | 作用 |
+|-------|------|------|
+| **Rules** | 规则 | `rules/global/` + `rules/agents/{worker}.md`，按需加载 |
+| **Tools** | 工具 | 仅允许 plan 中声明且已 APPROVED 的工具 |
+| **Validation** | 验证 | `verify_pipeline` — 输出质量校验，失败可重试本 Phase |
+| **Environment** | 环境 | 预算、token、降级、无进展检测 |
 
 ```text
-Every run start     → global/safety.md + global/budget.md only
-After routing       → agents/creator.md OR modes/code.md (one at a time)
-After final feedback → Learner writes to learnings/pending/ (you approve)
-```
-
-```text
-每次 Run 开始       → 仅加载 global/safety.md + global/budget.md
-路由确定后          → 按需加载 agents/*.md 或 modes/*.md
-整单反馈后          → Learner 写入 learnings/pending/（需你批准）
+每次 Run：global rules → triage → orchestrator plan → plan validate
+每个 Phase：env precheck → target rules → execute_plan_phase → verify
 ```
 
 ---
 
-## End-to-End Flow | 完整流程
+## LangGraph Flow | 完整节点流
+
+`pah run` 走以下 LangGraph 节点（`src/pahs/graph/main.py`）：
 
 ```mermaid
-sequenceDiagram
-    participant U as You 你
-    participant CH as Channel 通道
-    participant T as Triage
-    participant O as Orchestrator
-    participant W as Worker/Mode
-    participant V as Validation
-    participant L as Learner
-
-    U->>CH: Send command 下指令
-    CH->>T: Create run_id
-    T->>O: Lite or Full
-    O->>O: Plan milestones 规划阶段
-    loop Each milestone 每个阶段
-        O->>W: Dispatch + load rules 派发+加载规则
-        W->>V: Internal validation 内部验证
-        V->>O: Pass/Fail
-        O->>U: Present for review 呈现审核
-        U->>O: Approve or revise 通过或修改
-    end
-    O->>U: Final delivery 最终交付
-    U->>L: Final feedback 总反馈
-    L->>L: Pending proposals 待批准提案
+flowchart TD
+    A[ingest] --> B[load_global_rules]
+    B --> C[triage_score]
+    C --> D[orchestrator_plan]
+    D --> E[plan_validate]
+    E --> F[env_precheck]
+    F --> G[load_target_rules]
+    G --> H[execute_plan_phase]
+    H --> I[verify_pipeline]
+    I -->|通过·还有 Phase| J[present_milestone]
+    I -->|通过·全部完成| K[final_present]
+    I -->|失败| L[plan_retry_phase] --> H
+    J --> M[milestone_human_review]
+    M -->|通过·还有 Phase| F
+    M -->|通过·完成| K
+    M -->|驳回| L
+    K --> N[final_feedback_request]
+    N --> O[Learner]
 ```
-
-**Example | 示例 command:**
-
-```bash
-pah run "Research LangGraph checkpoint API and save Chinese notes to ~/notes"
-```
-
-| Step | What happens | 发生什么 |
-|------|--------------|----------|
-| 1 | Triage scores complexity → Full Orchestrator | 分诊 → Full 编排 |
-| 2 | Plan: M1 research, M2 outline, M3 write file | 规划三阶段 |
-| 3 | Searcher executes M1 → you review | Searcher 执行 → 你审核 |
-| 4 | Creator executes M2 → you review | Creator 执行 → 你审核 |
-| 5 | CODE mode executes M3 → you review | CODE 模式 → 你审核 |
-| 6 | Final delivery → you give overall feedback | 交付 → 你给总反馈 |
-| 7 | Learner creates pending improvement proposals | Learner 生成待批准提案 |
 
 ---
 
 ## Cross-Channel Review | 跨通道审核
 
-**EN:** All channels share one state in SQLite. A task started in Telegram can be approved from CLI using the same `run_id`.
-
-**中文：** 所有通道共享 SQLite 中的同一份状态。Telegram 发起的任务，可用同一 `run_id` 在 CLI 审核。
+所有通道共享 SQLite 中的同一份 `run_id` 状态。
 
 ```bash
-# Start from anywhere 任意通道发起
-pah run "write a post about AI"
-
-# Check pending reviews 查看待审核
+pah run "调研 LangGraph 并写一份中文笔记"
 pah pending
-
-# Approve from CLI even if started on Telegram
 pah reply run_20260624_155900_a3f9 "approved"
+pah feedback run_20260624_155900_a3f9 "下次调研要加官方文档链接"
 ```
 
-Key tables | 核心表：`runs`, `review_queue`, `user_channels`  
-Details in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md#5-cross-channel-review).
+**Telegram 直达 SMAS：** 生成后回复 `好` 或 `改：你的意见`
 
 ---
 
 ## Feedback & Learning | 反馈与学习
 
-Two types of user input — intentionally separated.  
-两种用户输入 — 刻意分开处理。
-
-| Type | When | 时机 | Triggers Learner? |
-|------|------|------|-------------------|
-| **Milestone review** | During the run | 执行过程中 | No — guides current run only |
-| **Final feedback** | After whole run completes | 整单完成后 | Yes — creates pending proposals |
-
-| 类型 | 时机 | 是否触发 Learner |
-|------|------|------------------|
-| **阶段审核** | 执行中 | 否 — 仅指导本次 Run |
+| 类型 | 时机 | 触发 Learner? |
+|------|------|---------------|
+| **阶段审核** | Phase 之间 | 否 — 指导当前 Run |
 | **总反馈** | 整单完成后 | 是 — 生成待批准提案 |
 
-```bash
-# After run completes 任务结束后
-pah feedback run_20260624_155900_a3f9 "Next time include official doc links in research reports"
+Learner 区分两类问题：
 
-# Review Learner proposals 审核 Learner 提案
+- **执行问题** → 更新 `rules/agents/*.md`、`standards/`
+- **计划问题** → 更新 `standards/learned/plan_patterns/*.json`（下次 Orchestrator 参考）
+
+```bash
 pah proposals pending
 pah proposals approve <proposal_id>
 ```
 
-> Nothing learned becomes active without your explicit approval.  
 > 所有学习结果必须经你明确批准才会生效。
-
----
-
-## Builder Safety | Builder 安全机制
-
-**EN:** Builder can generate new tools, but they **never** go live automatically.
-
-**中文：** Builder 可以生成新工具，但**永远不会**自动投入使用。
-
-```text
-DRAFT → TESTING → PENDING_REVIEW → APPROVED | REJECTED
-```
-
-| Rule (EN) | 规则（中文） |
-|-----------|--------------|
-| Staging tools are invisible to Orchestrator | 样品区工具对 Orchestrator 不可见 |
-| Tests passing is not enough | 测试通过 ≠ 可以上线 |
-| Manual approval is required | 必须人工批准 |
-| Secrets must never appear in generated code | 生成代码不得包含密钥 |
-
-```bash
-pah tools staging
-pah tools review <tool_name>
-pah tools approve <tool_name>
-pah tools reject <tool_name> --reason "not safe enough"
-```
 
 ---
 
 ## Tech Stack | 技术栈
 
-| Component | Choice | 选型 | Notes |
-|-----------|--------|------|-------|
-| Orchestration | **LangGraph** | 编排框架 | From Week 1, not later |
-| Language | **Python** | 语言 | 3.11+ recommended |
-| Storage (v1) | **SQLite** + files | 存储 | Local-first |
-| Storage (later) | **Supabase** | 后期可选 | Cloud sync, dashboard |
-| LLM (primary) | **DeepSeek V3** | 主力模型 | Orchestrator, Creator, Triage |
-| LLM (reasoning) | **DeepSeek R1** | 推理模型 | DEEP_THINK mode |
-| LLM (quality) | **Claude Sonnet / GPT-4o** | 高质量 | High-quality content, Builder |
-| LLM (batch code) | **Kimi K2** | 批量代码 | Batch code tasks |
-| Search | **Tavily API** | 搜索 | Searcher agent |
-| Local LLM | **None for now** | 暂不用本地 | Cloud-only in v1 |
-| Entry points | **CLI → Telegram → WhatsApp** | 入口顺序 | CLI first for development |
+| Component | Choice | Notes |
+|-----------|--------|-------|
+| Orchestration | **LangGraph** | Plan-driven phase execution |
+| Language | **Python 3.11+** | |
+| Storage | **SQLite** | runs, plan_json, review_queue, proposals |
+| LLM (primary) | **DeepSeek** | Orchestrator, Creator, Triage, Step 2 search |
+| Search Step 1 | **Perplexity** + **Tavily** | Search Router (`SEARCH_PROVIDER=smart`) |
+| External | **SMAS**, **PIP** | Local subprocess bridges |
+| Entry | **CLI**, **Telegram** | WhatsApp stub |
 
 ---
 
@@ -411,127 +307,121 @@ pah tools reject <tool_name> --reason "not safe enough"
 
 ```text
 PAHS/
-├── README.md                 # This file
-├── .env.example              # API key template (copy to .env)
-├── .gitignore
 ├── config/
-│   ├── budget.yaml           # Token/cost limits
-│   ├── models.yaml           # Model routing table
-│   └── review_policy.yaml    # Simple vs complex review rules
-├── docs/
-│   ├── ARCHITECTURE.md       # Full architecture spec
-│   └── ROADMAP.md            # 6-week development plan
-├── rules/
-│   ├── AGENTS.md             # Rule index (keep short)
-│   └── global/
-│       └── safety.md         # Non-overridable safety rules
-├── standards/                # User standards (from feedback) — Week 4+
-├── tools/
-│   ├── builtin/              # Approved production tools
-│   └── staging/              # Builder output (not callable)
-└── src/pahs/                 # Application code — Week 1+
-    ├── cli.py
-    ├── graph/
-    ├── gateway/
-    ├── agents/
-    ├── harness/
-    ├── routing/
-    ├── learning/
-    └── builder/
+│   ├── external_agents.yaml    # SMAS, PIP, OpenClaw
+│   ├── budget.yaml
+│   ├── models.yaml
+│   └── gateway.yaml            # Telegram direct tools
+├── standards/
+│   └── learned/plan_patterns/  # Learner → Orchestrator 计划模式
+├── src/pahs/
+│   ├── cli.py
+│   ├── graph/                  # LangGraph 主编排
+│   ├── gateway/                # Telegram, direct_tools, intent_router
+│   ├── planning/               # ExecutionPlan, Orchestrator, Plan Executor
+│   │   ├── schema.py
+│   │   ├── orchestrator_planner.py
+│   │   ├── step_router.py
+│   │   ├── plan_executor.py
+│   │   └── capability_catalog.py
+│   ├── agents/
+│   │   ├── search_router.py    # Tavily / Perplexity 五维路由 ✅
+│   │   ├── searcher.py
+│   │   ├── plan_nodes.py
+│   │   └── week1.py            # triage, orchestrator_plan, creator
+│   ├── external/               # SMAS, PIP bridges
+│   ├── harness/
+│   ├── routing/                # Triage, llm_router, worker_router
+│   ├── learning/
+│   └── tools/search_web.py
+└── docs/
+    ├── ARCHITECTURE.md
+    ├── ROADMAP.md
+    └── PAHS_深度学习教程_详细版.md
 ```
 
 ---
 
 ## Configuration | 配置说明
 
-Copy the environment template | 复制环境变量模板：
-
 ```bash
 cp .env.example .env
-# Edit .env with your API keys 填入你的 API Key
 ```
 
-| File | Purpose | 用途 |
-|------|---------|------|
-| `config/budget.yaml` | Daily/per-run token and cost limits | 每日/每任务预算 |
-| `config/models.yaml` | Model routing and downgrade chain | 模型路由与降级链 |
-| `config/review_policy.yaml` | How many reviews per task complexity | 不同难度任务的审核策略 |
-| `rules/AGENTS.md` | Rule index — what loads when | 规则索引与加载时机 |
-| `rules/global/safety.md` | Hard safety rules (Learner cannot override) | 不可覆盖的安全规则 |
+| Variable | Purpose |
+|----------|---------|
+| `DEEPSEEK_API_KEY` | Orchestrator, Creator, Triage, Search Step 2 |
+| `SEARCH_PROVIDER` | `smart` \| `auto` \| `perplexity` \| `tavily` \| `mock` |
+| `PERPLEXITY_API_KEY` | Deep research search (Step 1) |
+| `TAVILY_API_KEY` | Light lookup search (Step 1) |
+| `SEARCH_ROUTE_USE_LLM` | Gray-zone plan routing via DeepSeek (optional) |
+| `TELEGRAM_BOT_TOKEN` | Telegram bot |
 
-**Never commit `.env` or real API keys.**  
-**切勿提交 `.env` 或真实 API Key。**
-
----
-
-## Development Roadmap | 开发路线
-
-| Week | Goal (EN) | 目标（中文） | Key deliverable |
-|------|-----------|--------------|-----------------|
-| **1** | Minimal runnable core | 最小可运行核心 | LangGraph + CLI + `run_id` + milestone interrupt |
-| **2** | Harness four layers | Harness 四层 | Rules, tools, validation, environment |
-| **3** | Searcher + modes + Telegram | 搜索+模式+Telegram | Cross-channel review |
-| **4** | LLM router + standards | 路由+标准库 | Cost control, `standards/` |
-| **5** | Learner + proposals | 学习+提案审批 | Final feedback → pending rules |
-| **6** | Builder staging + WhatsApp | Builder+WhatsApp | Safe tool creation, manual approve |
-
-Full week-by-week plan: [`docs/ROADMAP.md`](docs/ROADMAP.md)
+**Never commit `.env`.**
 
 ---
 
 ## Getting Started | 快速开始
 
-### Prerequisites | 前置条件
+### Prerequisites
 
 - Python 3.11+
-- Git
-- API keys: DeepSeek (required), others optional — see `.env.example`
+- API keys — see `.env.example`
 
-### Clone & setup | 克隆与配置
+### Setup
 
 ```bash
 git clone https://github.com/ZacahryZhou/PAHS.git
 cd PAHS
+python -m venv .venv && source .venv/bin/activate
+pip install -e .
 cp .env.example .env
-# Fill in your API keys 填入 API Key
+# Edit .env with your keys
+
+pah init-db
 ```
 
-### Planned CLI (Week 1+) | 计划中的 CLI（第 1 周起）
+### Run
 
 ```bash
-# Run a command 执行任务
-pah run "write a short post about AI"
+# Full team flow (Path A)
+pah run "Research LangGraph and summarize in Chinese"
 
-# Check status 查看状态
-pah status <run_id>
+# Telegram bot
+pah telegram
 
-# List pending reviews 待审核列表
-pah pending
-
-# Reply to a review 回复审核
-pah reply <run_id> "approved"
-
-# Give final feedback after run 整单总反馈
-pah feedback <run_id> "next time use a more casual tone"
+# Preview internal plan without executing
+pah plan-preview "调研 Perplexity 和 Tavily，然后做一条 IG 图文"
 ```
 
-> **Note:** Application code (`src/pahs/`) is planned for Week 1. Current repo contains architecture, config, and rules baseline.  
-> **说明：** 应用代码（`src/pahs/`）将在第 1 周实现。当前仓库包含架构、配置与规则基线。
+---
+
+## CLI Reference | 常用命令
+
+| Command | 作用 |
+|---------|------|
+| `pah run "..."` | 启动完整 LangGraph Run（Path A） |
+| `pah plan-preview "..."` | 预览内部 ExecutionPlan，不执行 |
+| `pah route-preview "..."` | 预览 Triage 路由 |
+| `pah search-route-preview "..."` | 预览 Search Router（Tavily/Perplexity） |
+| `pah search-status` | 查看搜索配置 |
+| `pah pending` | 待审核列表 |
+| `pah reply <run_id> "approved"` | 回复阶段审核 |
+| `pah feedback <run_id> "..."` | 提交总反馈 → Learner |
+| `pah proposals pending` | 查看学习提案 |
+| `pah telegram` | 启动 Telegram bot |
 
 ---
 
 ## Documentation | 文档索引
 
-| Document | Content | 内容 |
-|----------|---------|------|
-| [`README.md`](README.md) | Project overview (this file) | 项目总览（本文件） |
-| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Full system architecture | 完整系统架构 |
-| [`docs/ROADMAP.md`](docs/ROADMAP.md) | 6-week development plan | 6 周开发计划 |
-| [`rules/AGENTS.md`](rules/AGENTS.md) | Rule loading index | 规则加载索引 |
-| [`rules/global/safety.md`](rules/global/safety.md) | Hard safety constraints | 硬性安全约束 |
-| [`config/review_policy.yaml`](config/review_policy.yaml) | Review frequency by task type | 按任务类型的审核策略 |
-| [`config/models.yaml`](config/models.yaml) | LLM routing table | 模型路由表 |
-| [`config/budget.yaml`](config/budget.yaml) | Cost and token limits | 成本与 token 限制 |
+| Document | Content |
+|----------|---------|
+| [`README.md`](README.md) | 项目总览（本文件） |
+| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | 架构规格 |
+| [`docs/ROADMAP.md`](docs/ROADMAP.md) | 开发路线 |
+| [`docs/PAHS_深度学习教程_详细版.md`](docs/PAHS_深度学习教程_详细版.md) | 代码走读教程 |
+| [`docs/PAHS_架构流程图.md`](docs/PAHS_架构流程图.md) | 架构流程图 |
 
 ---
 
@@ -539,24 +429,22 @@ pah feedback <run_id> "next time use a more casual tone"
 
 | # | English | 中文 |
 |---|---------|------|
-| 1 | **LangGraph from Day 1** — not a later migration | **从第一天就用 LangGraph** — 不做后期迁移 |
-| 2 | **Harness wraps every execution** — rules, tools, validation, environment | **每次执行都过 Harness 四层** |
-| 3 | **Lazy rule loading** — only load what the current step needs | **规则按需加载** — 不一次性塞满 prompt |
-| 4 | **Triage before Orchestrator** — simple tasks stay cheap and fast | **先分诊再编排** — 简单任务省钱省时 |
-| 5 | **You define "done"** — milestone review + final feedback | **你定义「完成」** — 阶段审核 + 总反馈 |
-| 6 | **Learn after the run** — final feedback only, pending approval | **整单后再学习** — 仅总反馈，且需批准 |
-| 7 | **Builder never auto-deploys** — staging, tests, manual approve | **Builder 永不自动上线** — 样品区 + 测试 + 人工批准 |
-| 8 | **One state, all channels** — `run_id` + SQLite, not per-chat memory | **一份状态，所有通道** — `run_id` + SQLite |
-| 9 | **No local LLM in v1** — cloud models, optional local later | **v1 不用本地 LLM** — 云端为主，后期可选本地 |
-| 10 | **Secrets stay local** — `.env` only, never committed | **密钥仅存本地** — 只用 `.env`，绝不提交 |
+| 1 | **Orchestrator publishes the plan** — agents follow the task table | **Orchestrator 发任务表** — Agent 按表执行 |
+| 2 | **Plan is internal** — stored, learned from; not shown by default | **计划内部存储** — 可学习，默认不展示 |
+| 3 | **Phases can parallelize** — artifacts pass downstream | **阶段内可并行** — artifacts 下传 |
+| 4 | **Harness wraps every phase** | **每个 Phase 都过 Harness** |
+| 5 | **Three routing layers** — Triage → Step Router → Search Router | **三层路由分工** — 各管一层 |
+| 6 | **Learn plan + execution** — Learner updates rules and plan_patterns | **计划与执行都学习** |
+| 7 | **You define "done"** — milestone review + final feedback | **你定义「完成」** |
+| 8 | **Nothing auto-applies** — proposals need approval | **学习永不自动生效** |
+| 9 | **One state, all channels** — `run_id` + SQLite | **一份状态，所有通道** |
+| 10 | **Builder never auto-deploys** | **Builder 永不自动上线** |
 
 ---
 
-## License & Status | 许可与状态
+## License & Status
 
-This is a **private personal project**. Architecture and planning phase — implementation starting Week 1.
-
-这是一个**个人私有项目**。当前处于架构与规划阶段 — 第 1 周实现即将开始。
+Private personal project. **Active development** — Orchestrator plan execution, Search Router, Telegram direct SMAS/PIP are implemented. Next: unify Telegram with Orchestrator (Path B → Path A), then final scoring pass for Triage + Step Router.
 
 ---
 

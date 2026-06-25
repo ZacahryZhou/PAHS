@@ -234,20 +234,111 @@ def summarize_test_data() -> dict[str, int]:
         ).fetchone()["c"]
         reviews = conn.execute("SELECT COUNT(*) AS c FROM review_queue").fetchone()["c"]
         events = conn.execute("SELECT COUNT(*) AS c FROM run_events").fetchone()["c"]
+        proposals = conn.execute("SELECT COUNT(*) AS c FROM learning_proposals").fetchone()
+        proposal_count = int(proposals["c"]) if proposals else 0
     return {
         "runs": int(runs),
         "pending_reviews": int(pending),
         "review_rows": int(reviews),
         "events": int(events),
+        "proposals": proposal_count,
     }
 
 
 def clear_all_run_data() -> dict[str, int]:
-    """Delete all runs, reviews, and events. Keeps user_channels."""
+    """Delete all runs, reviews, events, and pending proposals. Keeps user_channels."""
     summary = summarize_test_data()
     with connect() as conn:
+        conn.execute("DELETE FROM learning_proposals")
         conn.execute("DELETE FROM run_events")
         conn.execute("DELETE FROM review_queue")
         conn.execute("DELETE FROM runs")
         conn.commit()
     return summary
+
+
+def insert_proposal(data: dict[str, Any]) -> None:
+    with connect() as conn:
+        conn.execute(
+            """
+            INSERT INTO learning_proposals (
+              proposal_id, run_id, proposal_type, status, target_path, title,
+              feedback_text, proposed_content, rationale, reject_reason,
+              pending_file, created_at, resolved_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                data["proposal_id"],
+                data["run_id"],
+                data["proposal_type"],
+                data.get("status", "pending"),
+                data["target_path"],
+                data["title"],
+                data["feedback_text"],
+                data["proposed_content"],
+                data.get("rationale"),
+                data.get("reject_reason"),
+                data.get("pending_file"),
+                data.get("created_at", utc_now()),
+                data.get("resolved_at"),
+            ),
+        )
+        conn.commit()
+
+
+def get_proposal(proposal_id: str) -> dict[str, Any] | None:
+    with connect() as conn:
+        row = conn.execute(
+            "SELECT * FROM learning_proposals WHERE proposal_id = ?",
+            (proposal_id,),
+        ).fetchone()
+    return dict(row) if row else None
+
+
+def list_proposals(*, status: str | None = None) -> list[dict[str, Any]]:
+    with connect() as conn:
+        if status:
+            rows = conn.execute(
+                """
+                SELECT * FROM learning_proposals
+                WHERE status = ?
+                ORDER BY created_at ASC
+                """,
+                (status,),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT * FROM learning_proposals ORDER BY created_at ASC"
+            ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def update_proposal_status(
+    proposal_id: str,
+    *,
+    status: str,
+    reject_reason: str | None = None,
+    pending_file: str | None = None,
+) -> None:
+    with connect() as conn:
+        conn.execute(
+            """
+            UPDATE learning_proposals
+            SET status = ?, reject_reason = ?, pending_file = ?, resolved_at = ?
+            WHERE proposal_id = ?
+            """,
+            (status, reject_reason, pending_file, utc_now(), proposal_id),
+        )
+        conn.commit()
+
+
+def count_proposals(*, status: str | None = None) -> int:
+    with connect() as conn:
+        if status:
+            row = conn.execute(
+                "SELECT COUNT(*) AS c FROM learning_proposals WHERE status = ?",
+                (status,),
+            ).fetchone()
+        else:
+            row = conn.execute("SELECT COUNT(*) AS c FROM learning_proposals").fetchone()
+    return int(row["c"])

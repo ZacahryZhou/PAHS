@@ -77,5 +77,11 @@ def resume_run(run_id: str, user_input: str, *, channel: str = "cli") -> dict[st
 
     if not interrupts and result.get("status") == "COMPLETED":
         db.update_run(run_id, status="COMPLETED")
+        feedback = str(result.get("user_final_feedback") or user_input).strip()
+        if feedback:
+            from pahs.learning.learner import learn_from_final_feedback
+
+            proposals = learn_from_final_feedback(run_id, feedback)
+            result["learner_proposals"] = [item.proposal_id for item in proposals]
 
     return result

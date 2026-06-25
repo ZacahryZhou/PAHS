@@ -18,6 +18,8 @@ from pahs.harness.environment import EnvironmentMonitor
 from pahs.harness.rules import RuleEngine
 from pahs.harness.tools import list_tools_for_agent
 from pahs.harness.validation import verify_pipeline_node
+from pahs.routing.cost_estimator import record_cost_event
+from pahs.routing.no_progress import detect_no_progress, output_fingerprint
 from pahs.storage import db
 
 _rule_engine = RuleEngine()
@@ -73,10 +75,21 @@ def env_precheck_node(state: PAHSState) -> dict:
     monitor = EnvironmentMonitor(budget)
     result = monitor.precheck(state, step_name=f"{worker}_execute")
     db.log_event(state["run_id"], "environment_precheck", result.get("harness_event"))
+    if result.get("harness_event", {}).get("downgraded"):
+        db.log_event(
+            state["run_id"],
+            "routing_downgrade",
+            {
+                "routing_decision": result.get("routing_decision"),
+                "cost_estimate": result.get("cost_estimate"),
+            },
+        )
     return {
         "env_check_passed": result["env_check_passed"],
         "env_check_message": result["env_check_message"],
         "budget_snapshot": result["budget_snapshot"],
+        "routing_decision": result.get("routing_decision", state.get("routing_decision")),
+        "cost_estimate": result.get("cost_estimate", state.get("cost_estimate")),
         "status": "ENV_OK" if result["env_check_passed"] else "BLOCKED_BY_ENV",
     }
 
@@ -91,13 +104,32 @@ def worker_execute_node(state: PAHSState) -> dict:
 
 
 def handle_verify_retry_node(state: PAHSState) -> dict:
+    no_progress, reason = detect_no_progress(state)
+    if no_progress:
+        db.log_event(
+            state["run_id"],
+            "no_progress_detected",
+            {"reason": reason, "retry_count": state.get("retry_count", 0)},
+        )
+        return {
+            "no_progress_detected": True,
+            "validation_message": reason,
+            "status": "NO_PROGRESS",
+        }
+
     retry_count = state.get("retry_count", 0) + 1
     db.log_event(
         state["run_id"],
         "validation_retry",
         {"retry_count": retry_count, "reason": state.get("validation_message")},
     )
-    return {"retry_count": retry_count, "status": "RETRYING"}
+    return {
+        "retry_count": retry_count,
+        "last_validation_message": state.get("validation_message", ""),
+        "last_output_fingerprint": output_fingerprint(state.get("milestone_output", "")),
+        "no_progress_detected": False,
+        "status": "RETRYING",
+    }
 
 
 def failed_end_node(state: PAHSState) -> dict:
@@ -116,11 +148,15 @@ def blocked_end_node(state: PAHSState) -> dict:
 
 
 def present_milestone_node(state: PAHSState) -> dict:
+    model = (state.get("routing_decision") or {}).get("selected_model", "unknown")
+    estimate = state.get("cost_estimate") or {}
     presentation = (
         "## Milestone Review | 阶段审核\n\n"
         f"Run: `{state['run_id']}`\n"
         f"Worker: `{state.get('worker', 'creator')}`\n"
         f"Mode: `{state.get('execution_mode') or 'none'}`\n"
+        f"Model: `{model}`\n"
+        f"Est. cost: `${estimate.get('estimated_cost_usd', 0):.6f}`\n"
         f"Milestone: `{state.get('milestone_id', 'm1_output')}`\n"
         f"Complexity: `{state.get('complexity_band', 'unknown')}`\n\n"
         f"{state.get('milestone_output', '')}\n\n"
@@ -166,6 +202,17 @@ def final_feedback_node(state: PAHSState) -> dict:
             "final_response": state.get("final_response"),
         }
     )
+    budget_snapshot = state.get("budget_snapshot") or {}
+    actual = {
+        "tokens": budget_snapshot.get("tokens_used", 0),
+        "cost_usd": budget_snapshot.get("cost_usd", 0.0),
+    }
+    record_cost_event(
+        state["run_id"],
+        phase="post_run",
+        estimated=state.get("cost_estimate") or {},
+        actual=actual,
+    )
     return {
         "user_final_feedback": str(feedback),
         "status": "COMPLETED",
@@ -201,6 +248,12 @@ def route_after_milestone_review(state: PAHSState) -> Literal["final_present", "
     if approved:
         return "final_present"
     return "retry_worker"
+
+
+def route_after_retry(state: PAHSState) -> Literal["retry", "failed"]:
+    if state.get("no_progress_detected"):
+        return "failed"
+    return "retry"
 
 
 def build_graph():
@@ -244,7 +297,11 @@ def build_graph():
             "failed": "failed_end",
         },
     )
-    graph.add_edge("handle_verify_retry", "worker_execute")
+    graph.add_conditional_edges(
+        "handle_verify_retry",
+        route_after_retry,
+        {"retry": "worker_execute", "failed": "failed_end"},
+    )
     graph.add_edge("present_milestone", "milestone_human_review")
     graph.add_conditional_edges(
         "milestone_human_review",

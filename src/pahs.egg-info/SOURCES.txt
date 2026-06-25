@@ -35,6 +35,11 @@ src/pahs/harness/validation.py
 src/pahs/providers/__init__.py
 src/pahs/providers/mock.py
 src/pahs/routing/__init__.py
+src/pahs/routing/cost_estimator.py
+src/pahs/routing/llm_router.py
+src/pahs/routing/no_progress.py
+src/pahs/routing/standards_loader.py
+src/pahs/routing/task_classifier.py
 src/pahs/routing/worker_router.py
 src/pahs/storage/__init__.py
 src/pahs/storage/db.py

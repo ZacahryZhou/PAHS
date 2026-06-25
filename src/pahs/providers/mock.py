@@ -9,10 +9,15 @@ def mock_triage(command: str) -> dict:
     score = 25
     needs_research = any(word in lowered for word in ("research", "调研", "search", "investigate"))
     needs_code = any(word in lowered for word in ("code", "python", "file", "代码", "文件"))
+    needs_deep = any(
+        word in lowered for word in ("deep think", "reason step", "推理", "深入分析", "prove why")
+    )
     if needs_research:
         score += 25
     if needs_code:
         score += 20
+    if needs_deep:
+        score += 30
     if len(command) > 120:
         score += 15
 
@@ -31,7 +36,7 @@ def mock_triage(command: str) -> dict:
         "risk_level": "low",
         "needs_research": needs_research,
         "needs_code": needs_code,
-        "needs_deep_reasoning": score >= 70,
+        "needs_deep_reasoning": score >= 70 or needs_deep,
         "recommended_orchestrator": profile,
         "estimated_milestones": 1 if profile == "lite" else 2,
     }

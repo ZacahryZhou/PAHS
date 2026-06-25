@@ -55,7 +55,12 @@ src/pah/
 │   └── cli_adapter.py
 ├── storage/
 │   ├── db.py
-│   └── schema.sql
+│   └── schema.sqlpah run "write a short post about AI"
+pah pending
+pah reply <run_id> "approved"
+pah reply <run_id> "looks good"
+pah status <run_id>
+
 ├── agents/
 │   ├── triage.py
 │   ├── orchestrator.py

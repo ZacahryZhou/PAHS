@@ -1,21 +1,38 @@
-"""Week 1/2 agent stubs with Harness-aware planning."""
+"""Week 1/2 agent stubs with Week 4 routing-aware planning."""
 
 from __future__ import annotations
 
 from pahs.config_loader import review_policy_for_band
 from pahs.graph.state import PAHSState
-from pahs.providers.mock import mock_creator_output, mock_plan, mock_triage
+from pahs.providers.mock import mock_creator_output, mock_plan
+from pahs.routing.cost_estimator import estimate_run_cost, record_cost_event
+from pahs.routing.llm_router import route_model
+from pahs.routing.standards_loader import load_standards_for_task
+from pahs.routing.task_classifier import classify_command
 from pahs.storage import db
 
 
 def triage_node(state: PAHSState) -> dict:
-    command = state["user_command"]
-    triage = mock_triage(command)
-    band = triage.get("complexity_band", "simple")
+    classified = classify_command(state["user_command"])
+    band = classified["complexity_band"]
+    db.log_event(
+        state["run_id"],
+        "triage_routing",
+        {
+            "routing_context": classified["routing_context"],
+            "task_type": classified["task_type"],
+            "worker": classified["worker"],
+            "execution_mode": classified["execution_mode"],
+        },
+    )
     return {
-        "triage_result": triage,
-        "orchestrator_profile": triage["recommended_orchestrator"],
+        "triage_result": classified["triage_result"],
+        "routing_context": classified["routing_context"],
+        "task_type": classified["task_type"],
+        "orchestrator_profile": classified["orchestrator_profile"],
         "complexity_band": band,
+        "worker": classified["worker"],
+        "execution_mode": classified["execution_mode"],
         "review_policy": review_policy_for_band(band),
     }
 
@@ -23,7 +40,19 @@ def triage_node(state: PAHSState) -> dict:
 def orchestrator_plan_node(state: PAHSState) -> dict:
     profile = state.get("orchestrator_profile", "lite")
     triage = state.get("triage_result", {})
+    routing_context = state.get("routing_context", {})
+    task_type = state.get("task_type", "general_task")
+
+    routing_decision = route_model(routing_context)
+    cost_estimate = estimate_run_cost(routing_context, routing_decision)
+    standards = load_standards_for_task(task_type)
+
     plan = mock_plan(state["user_command"], profile, triage)
+    plan["routing_decision"] = routing_decision
+    plan["cost_estimate"] = cost_estimate
+    plan["standards_paths"] = standards["paths"]
+    plan["estimated_cost_usd"] = cost_estimate["estimated_cost_usd"]
+
     milestone = plan["milestones"][0]
     db.update_run(
         state["run_id"],
@@ -31,13 +60,31 @@ def orchestrator_plan_node(state: PAHSState) -> dict:
         current_milestone_id=milestone["id"],
         plan_json=plan,
     )
-    worker = plan.get("worker", "creator")
-    execution_mode = plan.get("execution_mode")
+    record_cost_event(
+        state["run_id"],
+        phase="pre_execution",
+        estimated=cost_estimate,
+    )
+    db.log_event(
+        state["run_id"],
+        "routing_decision",
+        {
+            "routing_decision": routing_decision,
+            "cost_estimate": cost_estimate,
+            "standards_paths": standards["paths"],
+        },
+    )
+
+    worker = plan.get("worker", state.get("worker", "creator"))
+    execution_mode = plan.get("execution_mode", state.get("execution_mode"))
     return {
         "plan": plan,
         "milestone_id": milestone["id"],
         "worker": worker,
         "execution_mode": execution_mode,
+        "routing_decision": routing_decision,
+        "cost_estimate": cost_estimate,
+        "standards_loaded": standards["paths"],
         "status": "PLANNED",
     }
 
@@ -50,6 +97,12 @@ def creator_node(state: PAHSState) -> dict:
     tools = state.get("tools_available", [])
     if tools:
         output += "\n[Harness] Approved tools: " + ", ".join(tools)
+    standards = state.get("standards_loaded", [])
+    if standards:
+        output += "\n[Harness] Standards: " + ", ".join(standards)
+    model = (state.get("routing_decision") or {}).get("selected_model")
+    if model:
+        output += f"\n[Harness] Routed model: {model}"
     return {
         "milestone_output": output,
         "status": "EXECUTED",

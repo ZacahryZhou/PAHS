@@ -10,6 +10,11 @@ class PAHSState(TypedDict, total=False):
     user_command: str
     channel: str
     triage_result: dict[str, Any]
+    routing_context: dict[str, Any]
+    routing_decision: dict[str, Any]
+    cost_estimate: dict[str, Any]
+    task_type: str
+    standards_loaded: list[str]
     orchestrator_profile: Literal["lite", "full"]
     complexity_band: Literal["simple", "medium", "complex"]
     review_policy: dict[str, Any]
@@ -30,6 +35,9 @@ class PAHSState(TypedDict, total=False):
     validation_score: float
     validation_stage: str
     retry_count: int
+    last_validation_message: str
+    last_output_fingerprint: str
+    no_progress_detected: bool
     presentation: str
     user_milestone_review: str
     user_final_feedback: str

@@ -27,3 +27,7 @@ def review_policy_for_band(band: str) -> dict[str, Any]:
 
 def budget_config() -> dict[str, Any]:
     return load_yaml("budget.yaml")
+
+
+def models_config() -> dict[str, Any]:
+    return load_yaml("models.yaml")

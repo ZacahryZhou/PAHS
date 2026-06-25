@@ -8,11 +8,18 @@ import typer
 
 from pahs.gateway.run_ids import new_run_id
 from pahs.graph.runner import resume_run, start_run
+from pahs.harness.budget import BudgetManager
 from pahs.harness.rules import RuleEngine
 from pahs.harness.test_reset import reset_all_test_data
+from pahs.routing.cost_estimator import estimate_run_cost
+from pahs.routing.llm_router import route_model
+from pahs.routing.standards_loader import load_standards_for_task
+from pahs.routing.task_classifier import classify_command
 from pahs.storage import db
 
 app = typer.Typer(help="Personal Agent Harness System (PAHS)")
+proposals_app = typer.Typer(help="Review Learner proposals.")
+app.add_typer(proposals_app, name="proposals")
 
 
 @app.command("init-db")
@@ -79,6 +86,12 @@ def reply(run_id: str, message: str) -> None:
     elif result.get("status") == "COMPLETED":
         typer.echo("\nRun completed.")
         typer.echo("运行已完成。")
+        proposal_ids = result.get("learner_proposals") or []
+        if proposal_ids:
+            typer.echo(f"Learner created {len(proposal_ids)} pending proposal(s).")
+            typer.echo(f"Learner 已生成 {len(proposal_ids)} 条待批准提案。")
+            typer.echo("Check with: pah proposals pending")
+            typer.echo("查看：pah proposals pending")
     else:
         typer.echo(json.dumps(result, ensure_ascii=False, indent=2, default=str))
 
@@ -110,6 +123,109 @@ def rules_show(scope: str = typer.Argument("global", help="global | creator | se
         typer.echo(f"- {path}")
 
 
+@app.command("route-preview")
+def route_preview(command: str) -> None:
+    """Preview routing, model choice, and cost estimate without running."""
+    classified = classify_command(command)
+    routing = route_model(classified["routing_context"])
+    cost = estimate_run_cost(classified["routing_context"], routing)
+    standards = load_standards_for_task(classified["task_type"])
+    payload = {
+        "command": command,
+        "task_type": classified["task_type"],
+        "complexity_band": classified["complexity_band"],
+        "orchestrator_profile": classified["orchestrator_profile"],
+        "worker": classified["worker"],
+        "execution_mode": classified["execution_mode"],
+        "routing_decision": routing,
+        "cost_estimate": cost,
+        "standards_paths": standards["paths"],
+    }
+    typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
+
+
+@app.command("costs-today")
+def costs_today() -> None:
+    """Show in-process daily budget counters (mock Week 4)."""
+    snapshot = BudgetManager("preview").to_dict()
+    typer.echo("Daily budget snapshot | 今日预算快照")
+    typer.echo(json.dumps(snapshot, ensure_ascii=False, indent=2))
+
+
+@app.command("feedback")
+def feedback(run_id: str, message: str) -> None:
+    """Submit final feedback for a completed run and create pending proposals."""
+    db.init_db()
+    run = db.get_run(run_id)
+    if run is None:
+        typer.echo(f"Unknown run_id={run_id}")
+        raise typer.Exit(code=1)
+    if run.get("status") != "COMPLETED":
+        typer.echo("Run is not completed yet. Use `pah reply` during final feedback.")
+        typer.echo("任务尚未完成。请在 final feedback 阶段使用 `pah reply`。")
+        raise typer.Exit(code=1)
+
+    from pahs.learning.learner import learn_from_final_feedback
+
+    proposals = learn_from_final_feedback(run_id, message)
+    typer.echo(f"Created {len(proposals)} pending proposal(s).")
+    typer.echo(f"已创建 {len(proposals)} 条待批准提案。")
+    for item in proposals:
+        typer.echo(f"- {item.proposal_id} [{item.proposal_type}] {item.title}")
+
+
+@proposals_app.command("pending")
+def proposals_pending() -> None:
+    """List pending Learner proposals."""
+    db.init_db()
+    from pahs.learning.proposals import list_pending_proposals
+
+    rows = list_pending_proposals()
+    if not rows:
+        typer.echo("No pending proposals.")
+        typer.echo("没有待批准提案。")
+        return
+    for row in rows:
+        typer.echo(
+            f"- {row.proposal_id} run={row.run_id} type={row.proposal_type} title={row.title}"
+        )
+
+
+@proposals_app.command("approve")
+def proposals_approve(proposal_id: str) -> None:
+    """Approve a pending proposal and apply it to future runs."""
+    db.init_db()
+    from pahs.learning.approvals import approve_proposal
+
+    try:
+        result = approve_proposal(proposal_id)
+    except ValueError as exc:
+        typer.echo(str(exc))
+        raise typer.Exit(code=1) from exc
+    typer.echo(json.dumps(result, ensure_ascii=False, indent=2))
+    typer.echo("Approved. Future runs can use the updated standard/rule.")
+    typer.echo("已批准。后续任务会使用更新后的标准/规则。")
+
+
+@proposals_app.command("reject")
+def proposals_reject(
+    proposal_id: str,
+    reason: str = typer.Option(..., "--reason", "-r", help="Why this proposal is rejected."),
+) -> None:
+    """Reject a pending proposal."""
+    db.init_db()
+    from pahs.learning.approvals import reject_proposal
+
+    try:
+        result = reject_proposal(proposal_id, reason=reason)
+    except ValueError as exc:
+        typer.echo(str(exc))
+        raise typer.Exit(code=1) from exc
+    typer.echo(json.dumps(result, ensure_ascii=False, indent=2))
+    typer.echo("Rejected proposal stored with reason.")
+    typer.echo("已拒绝并保存原因。")
+
+
 @app.command("telegram")
 def telegram_bot() -> None:
     """Start the Telegram gateway bot."""
@@ -139,7 +255,8 @@ def reset_test(
         f"- runs: {summary['runs']}\n"
         f"- pending reviews: {summary['pending_reviews']}\n"
         f"- review rows: {summary['review_rows']}\n"
-        f"- events: {summary['events']}"
+        f"- events: {summary['events']}\n"
+        f"- proposals: {summary.get('proposals', 0)}"
     )
 
     if summary["runs"] == 0 and summary["review_rows"] == 0 and summary["events"] == 0:

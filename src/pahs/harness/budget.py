@@ -90,6 +90,11 @@ class BudgetManager:
         BudgetManager._daily_tokens += tokens
         BudgetManager._daily_cost += cost_usd
 
+    @classmethod
+    def reset_daily(cls) -> None:
+        cls._daily_tokens = 0
+        cls._daily_cost = 0.0
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "run_id": self.run_id,

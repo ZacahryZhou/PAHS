@@ -44,3 +44,23 @@ CREATE TABLE IF NOT EXISTS run_events (
 );
 
 CREATE INDEX IF NOT EXISTS idx_run_events_run_id ON run_events(run_id);
+
+CREATE TABLE IF NOT EXISTS learning_proposals (
+  proposal_id TEXT PRIMARY KEY,
+  run_id TEXT NOT NULL,
+  proposal_type TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending',
+  target_path TEXT NOT NULL,
+  title TEXT NOT NULL,
+  feedback_text TEXT NOT NULL,
+  proposed_content TEXT NOT NULL,
+  rationale TEXT,
+  reject_reason TEXT,
+  pending_file TEXT,
+  created_at TEXT NOT NULL,
+  resolved_at TEXT,
+  FOREIGN KEY (run_id) REFERENCES runs(run_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_learning_proposals_status ON learning_proposals(status);
+CREATE INDEX IF NOT EXISTS idx_learning_proposals_run_id ON learning_proposals(run_id);

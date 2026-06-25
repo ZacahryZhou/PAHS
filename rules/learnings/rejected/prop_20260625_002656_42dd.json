@@ -1,0 +1,15 @@
+{
+  "proposal_id": "prop_20260625_002656_42dd",
+  "run_id": "run_20260624_172647_e43d",
+  "proposal_type": "routing_policy_update",
+  "status": "pending",
+  "target_path": "standards/learned/routing_notes.md",
+  "title": "Prefer cheaper routing when quality is sufficient",
+  "feedback_text": "use cheaper models",
+  "proposed_content": "- Prefer orchestrator lite and deepseek-chat for low-risk tasks.\n- Downgrade expensive models unless the user asks for high quality.",
+  "rationale": "User asked to reduce cost.",
+  "reject_reason": null,
+  "pending_file": null,
+  "created_at": "2026-06-25T00:26:56.368819+00:00",
+  "resolved_at": null
+}

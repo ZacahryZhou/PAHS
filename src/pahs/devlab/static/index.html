@@ -503,6 +503,7 @@
     async function loadHistory(selectRunId) {
       try {
         const res = await fetch("/api/runs?limit=30");
+        if (!res.ok) throw new Error("HTTP " + res.status);
         const data = await res.json();
         const runs = data.runs || [];
         if (!runs.length) {

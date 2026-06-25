@@ -100,7 +100,7 @@ def list_recent_runs(*, limit: int = 30) -> list[dict[str, Any]]:
             SELECT run_id, command, status, origin_channel, created_at, updated_at,
                    orchestrator_profile, plan_json
             FROM runs
-            ORDER BY id DESC
+            ORDER BY created_at DESC
             LIMIT ?
             """,
             (limit,),

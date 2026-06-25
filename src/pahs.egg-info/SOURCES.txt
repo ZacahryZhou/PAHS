@@ -23,12 +23,17 @@ src/pahs/builder/sandbox.py
 src/pahs/builder/tool_manifest.py
 src/pahs/external/__init__.py
 src/pahs/external/openclaw_bridge.py
+src/pahs/external/pip_bridge.py
 src/pahs/external/registry.py
 src/pahs/external/runner.py
 src/pahs/external/shell_bridge.py
+src/pahs/external/smas_bridge.py
 src/pahs/gateway/__init__.py
 src/pahs/gateway/cli_adapter.py
+src/pahs/gateway/direct_tools.py
+src/pahs/gateway/intent_router.py
 src/pahs/gateway/messages.py
+src/pahs/gateway/persona.py
 src/pahs/gateway/run_ids.py
 src/pahs/gateway/service.py
 src/pahs/gateway/telegram_adapter.py

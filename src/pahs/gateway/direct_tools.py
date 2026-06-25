@@ -8,25 +8,22 @@ from typing import Any
 from pahs.external.registry import get_external_agent, strip_external_prefix
 from pahs.external.runner import run_external_agent
 from pahs.gateway.run_ids import new_run_id
+from pahs.gateway.telegram_session import set_smas_review
 from pahs.storage import db
+
+SMAS_REVIEW_FOOTER = (
+    "\n\n——\n"
+    "满意回复：好\n"
+    "要修改回复：改：你的修改意见"
+)
 
 
 def _format_smas_delivery(result: dict[str, Any]) -> tuple[str, str | None]:
-    parsed = result.get("parsed_json") or {}
-    lines: list[str] = []
-    text = parsed.get("text")
-    if text:
-        lines.append(str(text).strip())
-    critic = parsed.get("critic")
-    if isinstance(critic, dict) and critic.get("summary"):
-        lines.append(f"Critic: {critic['summary']}")
-    preview = parsed.get("preview_image")
+    preview = result.get("preview_image") or (result.get("parsed_json") or {}).get("preview_image")
     image_path = str(preview) if preview and Path(str(preview)).exists() else None
+    body = str(result.get("text") or "预览已生成，请看上图。").strip()
     if image_path:
-        lines.append(f"Preview image: {image_path}")
-    body = "\n\n".join(line for line in lines if line).strip()
-    if not body:
-        body = str(result.get("text") or "SMAS finished with no text output.")
+        body = body + SMAS_REVIEW_FOOTER
     return body, image_path
 
 
@@ -43,6 +40,7 @@ def execute_direct_tool(
     command: str,
     *,
     channel: str = "telegram",
+    channel_user_id: str | None = None,
 ) -> dict[str, Any]:
     spec = get_external_agent(agent_name)
     if spec is None:
@@ -67,6 +65,10 @@ def execute_direct_tool(
         image_path = None
 
     status = "COMPLETED" if result.get("ok") else "FAILED"
+    if agent_name == "smas" and image_path and channel == "telegram" and channel_user_id:
+        status = "AWAITING_REVIEW"
+        set_smas_review(channel_user_id, run_id=run_id, image_path=image_path)
+
     db.update_run(run_id, status=status)
     db.log_event(
         run_id,
@@ -85,5 +87,58 @@ def execute_direct_tool(
         "ok": bool(result.get("ok")),
         "text": delivery_text,
         "image_path": image_path,
+        "awaiting_review": status == "AWAITING_REVIEW",
+        "raw": result,
+    }
+
+
+def execute_smas_review(
+    chat_id: str,
+    review_text: str,
+    *,
+    channel: str = "telegram",
+) -> dict[str, Any]:
+    from pahs.external.smas_bridge import run_smas_action
+    from pahs.gateway.telegram_session import clear_session, get_session, parse_smas_review_reply
+    from pahs.external.registry import get_external_agent
+
+    session = get_session(chat_id)
+    if not session or session.get("tool") != "smas":
+        raise ValueError("No SMAS preview waiting for review.")
+
+    action, payload = parse_smas_review_reply(review_text)
+    if action == "approve":
+        smas_text = "ok"
+    else:
+        smas_text = f"edit: {payload}"
+
+    spec = get_external_agent("smas")
+    if spec is None:
+        raise ValueError("SMAS is not enabled.")
+
+    run_id = str(session.get("run_id"))
+    result = run_smas_action(spec, smas_text)
+    clear_session(chat_id)
+    db.update_run(run_id, status="COMPLETED")
+    db.log_event(run_id, "smas_review_reply", {"action": action, "text": review_text})
+
+    if action == "approve":
+        text = "已保存草稿，这版定稿了。"
+    elif image_path:
+        caption = str(result.get("text") or "").strip()
+        text = "已按你的意见改好了，请看新预览：" + (f"\n\n{caption}" if caption else "")
+    else:
+        text = str(result.get("text") or "已按你的意见修改。")
+    preview = result.get("preview_image") or (result.get("parsed_json") or {}).get("preview_image")
+    image_path = str(preview) if preview and Path(str(preview)).exists() else None
+
+    return {
+        "action": "deliver",
+        "run_id": run_id,
+        "agent_name": "smas",
+        "ok": bool(result.get("ok")),
+        "text": text,
+        "image_path": image_path,
+        "awaiting_review": False,
         "raw": result,
     }

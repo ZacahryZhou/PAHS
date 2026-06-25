@@ -7,7 +7,7 @@ external_agents:
     type: smas
     description: SMAS — generate Instagram post content and preview image
     project_dir: ~/Desktop/SMAS
-    subcommand: message
+    subcommand: generate
     timeout_seconds: 900
     match_keywords:
       - smas

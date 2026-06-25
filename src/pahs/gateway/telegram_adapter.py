@@ -35,7 +35,7 @@ async def _process_message(update, *, raw_text: str) -> None:
 
     if action == "deliver":
         agent = str(payload.get("agent_name", "tool"))
-        intro = friendly_delivery_intro(agent)
+        intro = friendly_delivery_intro(agent, awaiting_review=bool(payload.get("awaiting_review")))
         body = f"{intro}\n\n{payload.get('text', '')}"
         image_path = payload.get("image_path")
         if image_path and Path(image_path).is_file():
@@ -124,6 +124,8 @@ def run_telegram_bot() -> None:
         )
     try:
         app = build_telegram_app()
+        print("PAHS Telegram bot is running. Send messages in Telegram; press Ctrl+C here to stop.")
+        print("PAHS Telegram 机器人已启动。在 Telegram 里发消息即可；要停止请按 Ctrl+C。")
         app.run_polling()
     except Exception as exc:
         name = exc.__class__.__name__

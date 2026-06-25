@@ -81,12 +81,14 @@ def friendly_working(tool_name: str | None = None) -> str:
     return "好，我处理一下，稍等～"
 
 
-def friendly_delivery_intro(agent_name: str) -> str:
+def friendly_delivery_intro(agent_name: str, *, awaiting_review: bool = False) -> str:
+    if agent_name == "smas" and awaiting_review:
+        return "预览图来了（SMAS），你看下这版："
     if agent_name == "smas":
-        return "做好了，这是给你的 IG 图文："
+        return "这是最终版本："
     if agent_name == "pip":
-        return "视频任务跑完了，结果如下："
-    return "搞定了，结果如下："
+        return "视频任务结果："
+    return "结果如下："
 
 
 def strip_robotic_prefix(text: str) -> str:

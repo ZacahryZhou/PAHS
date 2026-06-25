@@ -127,9 +127,20 @@ def handle_inbound_text(
 
     # Telegram direct mode: natural language -> SMAS / PIP -> immediate delivery.
     if channel == "telegram" and _telegram_direct_tools():
+        from pahs.gateway.telegram_session import get_session, is_smas_review_reply
+        from pahs.gateway.direct_tools import execute_smas_review
+
+        if is_smas_review_reply(stripped) and get_session(channel_user_id):
+            return execute_smas_review(channel_user_id, stripped, channel=channel)
+
         tool = infer_external_agent(stripped)
         if tool is not None:
-            return execute_direct_tool(tool.name, stripped, channel=channel)
+            return execute_direct_tool(
+                tool.name,
+                stripped,
+                channel=channel,
+                channel_user_id=channel_user_id,
+            )
 
     command = parse_run_command(text)
     if command:

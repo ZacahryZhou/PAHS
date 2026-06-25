@@ -33,6 +33,10 @@ def models_config() -> dict[str, Any]:
     return load_yaml("models.yaml")
 
 
+def gateway_config() -> dict[str, Any]:
+    return load_yaml("gateway.yaml")
+
+
 def llm_config() -> dict[str, Any]:
     return load_yaml("llm.yaml")
 

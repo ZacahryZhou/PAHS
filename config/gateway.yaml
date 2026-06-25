@@ -1,0 +1,5 @@
+gateway:
+  # Telegram: call SMAS/PIP directly and return results (no reply run_id flow).
+  telegram_direct_tools: true
+  # Telegram: if no tool matches, answer with DeepSeek/mock chat.
+  telegram_chat_fallback: true

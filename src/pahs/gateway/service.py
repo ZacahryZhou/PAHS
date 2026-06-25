@@ -5,12 +5,23 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from pahs.config_loader import gateway_config
 from pahs.external.registry import match_external_agent
+from pahs.gateway.direct_tools import execute_direct_tool
+from pahs.gateway.intent_router import infer_external_agent
 from pahs.gateway.run_ids import new_run_id
 from pahs.graph.runner import resume_run, start_run
 from pahs.storage import db
 
 RUN_ID_PATTERN = re.compile(r"run_\d{8}_\d{6}_[a-f0-9]{4}")
+
+
+def _telegram_direct_tools() -> bool:
+    return bool(gateway_config().get("gateway", {}).get("telegram_direct_tools", True))
+
+
+def _telegram_chat_fallback() -> bool:
+    return bool(gateway_config().get("gateway", {}).get("telegram_chat_fallback", True))
 
 
 def parse_reply_command(text: str) -> tuple[str, str] | None:
@@ -60,6 +71,22 @@ def format_pending_lines() -> list[str]:
     return lines
 
 
+def _handle_telegram_chat(text: str) -> dict[str, Any]:
+    from pahs.providers.router import llm_complete
+
+    answer = llm_complete(
+        system=(
+            "You are PAHS, the user's main personal agent orchestrator. "
+            "Answer clearly in the user's language. "
+            "If they want an Instagram post, suggest they ask for IG/图文 content. "
+            "If they want a video, suggest 短视频/视频."
+        ),
+        user=text,
+        phase="telegram_chat",
+    )
+    return {"action": "chat", "text": answer}
+
+
 def handle_inbound_text(
     text: str,
     *,
@@ -69,6 +96,7 @@ def handle_inbound_text(
 ) -> dict[str, Any]:
     db.init_db()
     db.resolve_user_id(channel, channel_user_id, default=user_id)
+    stripped = text.strip()
 
     reply = parse_reply_command(text)
     if reply is not None:
@@ -76,14 +104,20 @@ def handle_inbound_text(
         result = resume_run(run_id, message, channel=channel)
         return {"action": "reply", "run_id": run_id, "result": result}
 
-    if text.strip().lower() == "pending":
+    if stripped.lower() == "pending":
         return {"action": "pending", "lines": format_pending_lines()}
 
     run_match = RUN_ID_PATTERN.search(text)
-    if run_match and text.strip().lower().startswith("status "):
+    if run_match and stripped.lower().startswith("status "):
         run_id = run_match.group(0)
         row = db.get_run(run_id)
         return {"action": "status", "run_id": run_id, "run": row}
+
+    # Telegram direct mode: natural language -> SMAS / PIP -> immediate delivery.
+    if channel == "telegram" and _telegram_direct_tools():
+        tool = infer_external_agent(stripped)
+        if tool is not None:
+            return execute_direct_tool(tool.name, stripped, channel=channel)
 
     command = parse_run_command(text)
     if command:
@@ -97,15 +131,18 @@ def handle_inbound_text(
             "interrupt_message": _interrupt_message(result),
         }
 
+    if channel == "telegram" and _telegram_chat_fallback() and stripped:
+        return _handle_telegram_chat(stripped)
+
     return {
         "action": "help",
         "message": (
             "PAHS main agent ready.\n\n"
-            "Start a task:\n"
+            "Telegram direct mode:\n"
+            "- 给咖啡店做一条开业 IG 图文\n"
+            "- 做一个 10 秒咖啡宣传短视频\n\n"
+            "Advanced:\n"
             "run <command>\n"
-            "@smas <IG post task>\n"
-            "@pip <video task>\n\n"
-            "Review:\n"
             "reply <run_id> approved\n"
             "pending"
         ),

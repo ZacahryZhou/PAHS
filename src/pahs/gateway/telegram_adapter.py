@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 
 from pahs.env import load_project_env
-from pahs.gateway.service import format_pending_lines, handle_inbound_text
+from pahs.gateway.service import handle_inbound_text
 
 load_project_env()
 
@@ -22,15 +23,14 @@ def build_telegram_app():
     async def start(update, context):
         chat_id = str(update.effective_chat.id)
         text = (
-            "PAHS Telegram gateway ready.\n"
-            "PAHS Telegram 网关已就绪。\n\n"
-            "Start | 启动任务:\n"
-            "run write a short post about AI\n"
-            "@smas create an IG post for a coffee shop\n"
-            "@pip create a 10s promo video\n\n"
-            "Review | 审核:\n"
-            "reply run_xxx approved\n"
-            "pending\n\n"
+            "PAHS 主控已就绪。\n"
+            "PAHS is ready.\n\n"
+            "直接说话即可 | Just chat:\n"
+            "• 给咖啡店做一条开业 IG 图文 → 自动调用 SMAS\n"
+            "• 做一个 10 秒咖啡宣传短视频 → 自动调用 PIP\n"
+            "• 普通问题 → PAHS 直接回答\n\n"
+            "成果会直接发给你，不用 reply run_id。\n"
+            "Results are delivered directly.\n\n"
             f"Chat ID: {chat_id}"
         )
         await update.message.reply_text(text)
@@ -39,13 +39,36 @@ def build_telegram_app():
         if update.message is None or update.message.text is None:
             return
         chat_id = str(update.effective_chat.id)
-        await update.message.reply_text("Working... / 处理中...")
+        await update.message.reply_text("处理中... / Working...")
         payload = handle_inbound_text(
             update.message.text,
             channel="telegram",
             channel_user_id=chat_id,
         )
         action = payload.get("action")
+
+        if action == "deliver":
+            agent = payload.get("agent_name", "tool")
+            run_id = payload.get("run_id", "")
+            header = f"✅ PAHS → {agent}\nrun_id: {run_id}\n\n"
+            body = header + str(payload.get("text", ""))
+            image_path = payload.get("image_path")
+            if image_path and Path(image_path).is_file():
+                with Path(image_path).open("rb") as handle:
+                    await update.message.reply_photo(
+                        photo=handle,
+                        caption=body[:1024],
+                    )
+                if len(body) > 1024:
+                    await update.message.reply_text(body[1024:])
+            else:
+                await update.message.reply_text(body)
+            return
+
+        if action == "chat":
+            await update.message.reply_text(str(payload.get("text", "")))
+            return
+
         if action == "run":
             run_id = payload["run_id"]
             command = payload.get("command", "")
@@ -69,17 +92,12 @@ def build_telegram_app():
                     text += f"\n\n{extra}\n\nReply: reply {run_id} <feedback>"
                 await update.message.reply_text(text)
             elif result.get("status") == "COMPLETED":
-                proposal_note = ""
-                proposals = result.get("learner_proposals") or []
-                if proposals:
-                    proposal_note = (
-                        f"\nLearner proposals: {len(proposals)} pending."
-                        f"\nUse CLI: pah proposals pending"
-                    )
-                await update.message.reply_text(f"Run {run_id} completed.{proposal_note}")
+                await update.message.reply_text(f"Run {run_id} completed.")
             else:
                 await update.message.reply_text(f"Run {run_id} updated.")
         elif action == "pending":
+            from pahs.gateway.service import format_pending_lines
+
             await update.message.reply_text("\n".join(payload["lines"]))
         elif action == "status":
             await update.message.reply_text(str(payload.get("run")))
@@ -92,5 +110,24 @@ def build_telegram_app():
 
 
 def run_telegram_bot() -> None:
-    app = build_telegram_app()
-    app.run_polling()
+    token = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
+    if not token:
+        raise RuntimeError(
+            "TELEGRAM_BOT_TOKEN is missing. Add it to ~/Desktop/PAHS/.env"
+        )
+    if ":" not in token or token.count(":") != 1:
+        raise RuntimeError(
+            "TELEGRAM_BOT_TOKEN looks incomplete. "
+            "It must look like 123456789:AAH... from BotFather (two parts with one colon)."
+        )
+    try:
+        app = build_telegram_app()
+        app.run_polling()
+    except Exception as exc:
+        name = exc.__class__.__name__
+        if name == "InvalidToken":
+            raise RuntimeError(
+                "Telegram rejected TELEGRAM_BOT_TOKEN. "
+                "Copy the full token from @BotFather (/token), paste into .env, then retry."
+            ) from exc
+        raise

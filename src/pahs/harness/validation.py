@@ -8,12 +8,19 @@ from pahs.graph.state import PAHSState
 FORBIDDEN_SNIPPETS = ("api_key", "password", "secret")
 
 
+def _content_for_secret_scan(output: str) -> str:
+    """Ignore tool warnings / env hints — they mention key names, not leaked secrets."""
+    if "\n\nWarning:" in output:
+        return output.split("\n\nWarning:", 1)[0]
+    return output
+
+
 def _stage1_rules(output: str) -> tuple[bool, str, float]:
     if not output.strip():
         return False, "Stage 1 failed: output is empty.", 0.0
     if len(output.strip()) < 20:
         return False, "Stage 1 failed: output is too short.", 0.2
-    lowered = output.lower()
+    lowered = _content_for_secret_scan(output).lower()
     for snippet in FORBIDDEN_SNIPPETS:
         if snippet in lowered:
             return False, f"Stage 1 failed: forbidden snippet `{snippet}` detected.", 0.0

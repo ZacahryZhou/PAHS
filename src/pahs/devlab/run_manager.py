@@ -49,6 +49,23 @@ def _sync_handle_from_db(handle: RunHandle) -> None:
         handle.status = str(row.get("status") or handle.status)
 
 
+def extract_run_error(run_id: str, handle: RunHandle | None = None) -> str | None:
+    if handle and handle.error:
+        return handle.error
+    for event in reversed(db.list_run_events(run_id)):
+        et = str(event.get("event_type", ""))
+        payload = event.get("payload") or {}
+        if et == "devlab_run_failed":
+            return str(payload.get("error") or "Run failed")
+        if et == "validation_failed":
+            return str(payload.get("message") or "Validation failed")
+    return None
+
+
+def _finalize_failed(handle: RunHandle) -> None:
+    handle.error = extract_run_error(handle.run_id, handle)
+
+
 def start_run_async(command: str) -> RunHandle:
     db.init_db()
     run_id = new_run_id()
@@ -78,10 +95,12 @@ def start_run_async(command: str) -> RunHandle:
                 db.log_event(run_id, "devlab_run_completed", {"status": "COMPLETED"})
             else:
                 _sync_handle_from_db(handle)
+                if handle.status == "FAILED":
+                    _finalize_failed(handle)
         except Exception as exc:
             handle.status = "FAILED"
             handle.error = str(exc)
-            db.log_event(run_id, "devlab_run_failed", {"error": str(exc)})
+            db.log_event(run_id, "devlab_run_failed", {"error": str(exc), "node_id": "orchestrator_plan"})
             db.update_run(run_id, status="FAILED")
 
     thread = threading.Thread(target=worker, name=f"devlab-{run_id}", daemon=True)
@@ -120,10 +139,12 @@ def resume_run_async(run_id: str, message: str) -> RunHandle:
                 db.log_event(run_id, "devlab_run_completed", {"status": "COMPLETED"})
             else:
                 _sync_handle_from_db(handle)
+                if handle.status == "FAILED":
+                    _finalize_failed(handle)
         except Exception as exc:
             handle.status = "FAILED"
             handle.error = str(exc)
-            db.log_event(run_id, "devlab_run_failed", {"error": str(exc)})
+            db.log_event(run_id, "devlab_run_failed", {"error": str(exc), "node_id": "verify_pipeline"})
 
     thread = threading.Thread(target=worker, name=f"devlab-resume-{run_id}", daemon=True)
     thread.start()
@@ -162,11 +183,13 @@ def run_snapshot(run_id: str) -> dict[str, Any]:
     pending = [r for r in db.list_pending_reviews() if r["run_id"] == run_id]
     waiting_review = bool(pending) or (handle and handle.status in {"AWAITING_REVIEW", "AWAITING_FINAL_FEEDBACK"})
 
+    error = extract_run_error(run_id, handle)
+
     return {
         "run_id": run_id,
         "command": row.get("command"),
         "status": handle.status if handle else row.get("status"),
-        "error": handle.error if handle else None,
+        "error": error,
         "waiting_review": waiting_review,
         "review_type": handle.review_type if handle else (pending[-1]["review_type"] if pending else None),
         "interrupt_message": handle.interrupt_message if handle else None,

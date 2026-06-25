@@ -153,9 +153,77 @@
     .g-node.done text { fill: #fff !important; }
     .g-node.done .sub { fill: #ccc !important; }
     .g-node.waiting rect { fill: #fff; stroke: #000; stroke-dasharray: 4 2; }
+    .g-node.failed rect { fill: #fff; stroke: #c00; stroke-width: 2.5; }
+    .g-node { cursor: pointer; }
     .g-edge { stroke: #bbb; stroke-width: 1; fill: none; }
     .g-edge.path-b { stroke: #ddd; stroke-dasharray: 5 3; }
     .g-edge.active { stroke: #000; stroke-width: 1.5; }
+    .msg.error { align-self: stretch; border: 1px solid #c00; color: #900; background: #fff5f5; font-size: 0.8rem; }
+    #error-banner {
+      display: none;
+      margin: 0 12px 8px;
+      padding: 8px 10px;
+      border: 1px solid #c00;
+      background: #fff5f5;
+      color: #900;
+      font-size: 0.75rem;
+      white-space: pre-wrap;
+      max-height: 120px;
+      overflow-y: auto;
+    }
+    #error-banner.visible { display: block; }
+    .modal-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.35);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+    .modal-backdrop.open { display: flex; }
+    .modal {
+      background: #fff;
+      border: 1px solid #000;
+      max-width: 640px;
+      width: 100%;
+      max-height: 80vh;
+      display: flex;
+      flex-direction: column;
+    }
+    .modal header {
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .modal header h2 { margin: 0; font-size: 0.95rem; }
+    .modal-close { background: none; border: none; color: #000; font-size: 1.2rem; padding: 0 4px; }
+    .modal-body {
+      padding: 12px 14px;
+      overflow-y: auto;
+      font-size: 0.8rem;
+    }
+    .event-card {
+      border: 1px solid var(--border);
+      margin-bottom: 8px;
+      padding: 8px;
+    }
+    .event-card .meta { font-family: monospace; font-size: 0.7rem; color: var(--muted); margin-bottom: 4px; }
+    .event-card pre {
+      margin: 4px 0 0;
+      padding: 6px;
+      background: #f5f5f5;
+      font-size: 0.68rem;
+      overflow-x: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .timeline-row { cursor: pointer; padding: 1px 0; }
+    .timeline-row:hover { color: #000; text-decoration: underline; }
+    .timeline-row.err { color: #c00; }
   </style>
 </head>
 <body>
@@ -166,6 +234,7 @@
   <main>
     <section class="chat-panel">
       <div class="panel-title">Chat</div>
+      <div id="error-banner"></div>
       <div id="messages"></div>
       <div class="review-box" id="review-box">
         <div class="review-preview" id="review-preview"></div>
@@ -189,9 +258,18 @@
       <div id="graph-wrap">
         <svg id="arch-svg" viewBox="0 0 820 720" xmlns="http://www.w3.org/2000/svg"></svg>
       </div>
-      <div id="timeline">事件时间线</div>
+      <div id="timeline">事件时间线 · 点击节点或事件查看详情</div>
     </section>
   </main>
+  <div class="modal-backdrop" id="modal">
+    <div class="modal">
+      <header>
+        <h2 id="modal-title">节点详情</h2>
+        <button type="button" class="modal-close" id="modal-close">×</button>
+      </header>
+      <div class="modal-body" id="modal-body"></div>
+    </div>
+  </div>
   <script>
     const svg = document.getElementById("arch-svg");
     const messagesEl = document.getElementById("messages");
@@ -204,11 +282,17 @@
     const reviewPreview = document.getElementById("review-preview");
     const reviewInput = document.getElementById("review-input");
     const mainComposer = document.getElementById("main-composer");
+    const errorBanner = document.getElementById("error-banner");
+    const modal = document.getElementById("modal");
+    const modalTitle = document.getElementById("modal-title");
+    const modalBody = document.getElementById("modal-body");
 
     let currentRunId = null;
     let eventSource = null;
     let pollTimer = null;
     let graphMeta = { nodes: [], edges: [] };
+    let lastProgress = null;
+    let lastShownError = "";
 
     function isArchQuery(t) {
       return /^(目前)?架构$|^architecture$|^流程$/i.test(t.trim());
@@ -220,6 +304,72 @@
       el.textContent = text;
       messagesEl.appendChild(el);
       messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+
+    function showRunError(err) {
+      if (!err) {
+        errorBanner.classList.remove("visible");
+        errorBanner.textContent = "";
+        return;
+      }
+      errorBanner.classList.add("visible");
+      errorBanner.textContent = "运行失败：\n" + err;
+      if (err !== lastShownError) {
+        lastShownError = err;
+        addMessage("error", "❌ " + err);
+      }
+    }
+
+    function openNodeModal(nodeId) {
+      if (!lastProgress) return;
+      const node = (lastProgress.nodes || []).find((n) => n.id === nodeId);
+      const events = (lastProgress.node_details || {})[nodeId] || [];
+      modalTitle.textContent = node
+        ? `${node.label} (${node.sublabel || node.id})`
+        : nodeId;
+      if (!events.length) {
+        modalBody.innerHTML = "<p>该节点暂无事件记录。运行命令后点击已执行的节点查看详情。</p>";
+      } else {
+        modalBody.innerHTML = events.map((e) => {
+          const t = (e.created_at || "").replace("T", " ").slice(0, 19);
+          const payload = JSON.stringify(e.payload || {}, null, 2);
+          return `<div class="event-card">
+            <div class="meta">${t} · ${e.event_type}</div>
+            <div>${e.summary || ""}</div>
+            <pre>${payload}</pre>
+          </div>`;
+        }).join("");
+      }
+      modal.classList.add("open");
+    }
+
+    function openEventModal(entry) {
+      modalTitle.textContent = entry.node_id || entry.event_type || "事件详情";
+      modalBody.innerHTML = `<div class="event-card">
+        <div class="meta">${(entry.created_at || "").replace("T", " ").slice(0, 19)} · ${entry.event_type}</div>
+        <div>${entry.summary || ""}</div>
+        <pre>${JSON.stringify(entry.payload || {}, null, 2)}</pre>
+      </div>`;
+      modal.classList.add("open");
+    }
+
+    document.getElementById("modal-close").onclick = () => modal.classList.remove("open");
+    modal.onclick = (e) => { if (e.target === modal) modal.classList.remove("open"); };
+
+    function applyProgress(data) {
+      lastProgress = data;
+      renderGraph(data);
+      renderTimeline(data);
+      const err = data.run_error || (data.snapshot && data.snapshot.error);
+      showRunError(err || null);
+      if (data.snapshot) {
+        runLabel.textContent = data.snapshot.run_id || currentRunId || "idle";
+        statusLabel.textContent = data.snapshot.status || data.run_status || "ready";
+        setReviewMode(data.snapshot);
+        if (data.snapshot.status === "FAILED" && data.snapshot.error) {
+          sendBtn.disabled = false;
+        }
+      }
     }
 
     function nodeCenter(n) {
@@ -252,26 +402,32 @@
       data.nodes.forEach((n) => {
         const st = n.status || "pending";
         const cx = n.x + n.w / 2;
+        const textFill = st === "done" ? "#fff" : "#000";
+        const subFill = st === "done" ? "#ccc" : "#666";
         svgHtml += `<g class="g-node ${st}" data-id="${n.id}">`;
         svgHtml += `<rect x="${n.x}" y="${n.y}" width="${n.w}" height="${n.h}" rx="3"/>`;
-        svgHtml += `<text x="${cx}" y="${n.y + 14}" text-anchor="middle" font-size="10" font-weight="600" fill="#000">${n.label}</text>`;
-        svgHtml += `<text class="sub" x="${cx}" y="${n.y + 26}" text-anchor="middle" font-size="8" fill="#666">${n.sublabel || ""}</text>`;
+        svgHtml += `<text x="${cx}" y="${n.y + 14}" text-anchor="middle" font-size="10" font-weight="600" fill="${textFill}">${n.label}</text>`;
+        svgHtml += `<text class="sub" x="${cx}" y="${n.y + 26}" text-anchor="middle" font-size="8" fill="${subFill}">${n.sublabel || ""}</text>`;
         if (st === "active") {
           svgHtml += `<text x="${n.x + n.w - 4}" y="${n.y + 10}" text-anchor="end" font-size="7" fill="#000">●</text>`;
+        }
+        if (st === "failed") {
+          svgHtml += `<text x="${n.x + n.w - 4}" y="${n.y + 10}" text-anchor="end" font-size="8" fill="#c00">!</text>`;
         }
         svgHtml += "</g>";
       });
 
-      // Path labels
       svgHtml += `<text x="120" y="88" font-size="9" fill="#999" text-anchor="middle">Path B</text>`;
       svgHtml += `<text x="400" y="88" font-size="9" fill="#000" text-anchor="middle" font-weight="600">Path A</text>`;
 
       svg.innerHTML = svgHtml;
+      svg.querySelectorAll(".g-node").forEach((g) => {
+        g.onclick = () => openNodeModal(g.getAttribute("data-id"));
+      });
 
       if (activeId && nodeMap[activeId]) {
         const n = nodeMap[activeId];
-        const g = svg.querySelector(`[data-id="${activeId}"]`);
-        if (g) g.parentElement && document.getElementById("graph-wrap").scrollTo({
+        document.getElementById("graph-wrap").scrollTo({
           top: Math.max(0, n.y - 80), behavior: "smooth"
         });
       }
@@ -280,19 +436,23 @@
     function renderTimeline(data) {
       const tl = data.timeline || [];
       if (!tl.length) {
-        timelineEl.textContent = "运行后此处显示事件流";
+        timelineEl.textContent = "运行后此处显示事件流 · 点击节点或事件查看详情";
         return;
       }
-      timelineEl.innerHTML = tl.slice(-10).map((e) =>
-        `<div>${(e.created_at || "").slice(11, 19)} [${e.node_id || "-"}] ${e.summary}</div>`
-      ).join("");
+      timelineEl.innerHTML = tl.slice(-12).map((e, i) => {
+        const err = e.event_type === "devlab_run_failed" || e.event_type === "validation_failed";
+        const idx = tl.length - tl.slice(-12).length + i;
+        return `<div class="timeline-row${err ? " err" : ""}" data-idx="${idx}">${(e.created_at || "").slice(11, 19)} [${e.node_id || "-"}] ${e.summary}</div>`;
+      }).join("");
+      timelineEl.querySelectorAll(".timeline-row").forEach((row) => {
+        row.onclick = () => openEventModal(tl[Number(row.dataset.idx)]);
+      });
     }
 
     async function loadArchitecture() {
       const res = await fetch("/api/architecture");
       const data = await res.json();
-      renderGraph(data);
-      renderTimeline(data);
+      applyProgress(data);
     }
 
     function setReviewMode(snap) {
@@ -312,25 +472,24 @@
       pollTimer = setInterval(async () => {
         const res = await fetch("/api/runs/" + runId + "/progress");
         const data = await res.json();
-        renderGraph(data);
-        renderTimeline(data);
-        if (data.snapshot) {
-          runLabel.textContent = data.snapshot.run_id;
-          statusLabel.textContent = data.snapshot.status;
-          setReviewMode(data.snapshot);
+        applyProgress(data);
+        if (data.snapshot && ["COMPLETED", "FAILED", "BLOCKED"].includes(data.snapshot.status)) {
+          clearInterval(pollTimer);
+          sendBtn.disabled = false;
         }
       }, 400);
     }
 
     function connectStream(runId) {
       if (eventSource) eventSource.close();
+      lastShownError = "";
       startPolling(runId);
       eventSource = new EventSource("/api/runs/" + runId + "/events/stream");
       eventSource.onmessage = (ev) => {
         const data = JSON.parse(ev.data);
         if (data.done) { eventSource.close(); sendBtn.disabled = false; return; }
-        if (data.progress) { renderGraph(data.progress); renderTimeline(data.progress); }
-        if (data.snapshot) setReviewMode(data.snapshot);
+        if (data.progress) applyProgress({ ...data.progress, snapshot: data.snapshot });
+        else if (data.snapshot) applyProgress({ snapshot: data.snapshot });
       };
     }
 
@@ -376,7 +535,7 @@
     };
 
     loadArchitecture();
-    addMessage("system", "右侧 = 全局架构图（Path A + Path B）。发命令可看实时进度。");
+    addMessage("system", "右侧 = 全局架构图。点击任意节点查看该步详细事件与 payload；出错会红框标出并显示完整错误。");
   </script>
 </body>
 </html>

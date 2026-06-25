@@ -83,6 +83,8 @@ EVENT_TO_GRAPH_NODE: dict[str, str] = {
     "search_route": "search_router",
     "validation_retry": "verify_pipeline",
     "validation_failed": "verify_pipeline",
+    "devlab_run_failed": "orchestrator_plan",
+    "llm_usage": "triage_score",
     "devlab_interrupt": "milestone_review",
     "devlab_run_completed": "final_present",
     "learner_proposals_created": "learner",
@@ -137,7 +139,9 @@ def build_graph_progress(
     node_ids = [n["id"] for n in ARCHITECTURE_GRAPH["nodes"]]
     states: dict[str, str] = {nid: "pending" for nid in node_ids}
     timeline: list[dict[str, Any]] = []
+    node_details: dict[str, list[dict[str, Any]]] = {nid: [] for nid in node_ids}
     active_workers: set[str] = set()
+    run_error: str | None = None
 
     for event in events:
         et = str(event.get("event_type", ""))
@@ -145,36 +149,71 @@ def build_graph_progress(
         node_id = EVENT_TO_GRAPH_NODE.get(et)
         if et == "rules_loaded":
             node_id = _rules_node(payload)
+        if et == "llm_usage":
+            node_id = {
+                "triage": "triage_score",
+                "orchestrator_plan": "orchestrator_plan",
+            }.get(str(payload.get("phase", "")), node_id)
         if et == "plan_phase_executed":
             node_id = "execute_plan_phase"
             for w in payload.get("workers") or []:
                 active_workers.add(f"worker_{w}")
-            # infer worker from task if in payload
             worker = payload.get("worker")
             if worker:
                 active_workers.add(f"worker_{worker}")
+        if et == "devlab_run_failed":
+            node_id = str(payload.get("node_id") or "orchestrator_plan")
+            run_error = str(payload.get("error") or "Run failed")
+            if node_id in states:
+                states[node_id] = "failed"
+        if et == "validation_failed":
+            node_id = "verify_pipeline"
+            states["verify_pipeline"] = "failed"
+            run_error = str(payload.get("message") or run_error or "Validation failed")
 
         summary = et.replace("_", " ")
         if et == "triage_routing":
             summary = f"Triage → {payload.get('worker', '?')}"
         elif et == "orchestrator_plan_created":
-            summary = f"Plan {payload.get('phase_count')} phases"
+            summary = f"Plan {payload.get('phase_count')} phases, source={payload.get('plan_source')}"
         elif et == "plan_phase_executed":
-            summary = f"Phase {payload.get('phase_id')}"
+            summary = f"Phase {payload.get('phase_id')} workers={payload.get('workers', [])}"
         elif et == "search_route":
             summary = f"Search → {payload.get('provider', '?')}"
             active_workers.add("worker_searcher")
+        elif et == "validation_failed":
+            summary = f"Verify FAILED: {payload.get('message', '?')}"
+        elif et == "validation_retry":
+            summary = f"Verify retry #{payload.get('retry_count')}: {payload.get('reason', '')}"
+        elif et == "devlab_run_failed":
+            summary = f"ERROR: {(payload.get('error') or '')[:160]}"
+        elif et == "llm_usage":
+            usage = payload.get("usage") or {}
+            summary = (
+                f"LLM {payload.get('phase')} "
+                f"tokens={usage.get('total_tokens', '?')}"
+            )
+        elif et == "plan_validated":
+            summary = f"Valid={payload.get('valid')} errors={payload.get('errors', [])}"
 
-        timeline.append(
-            {
-                "event_type": et,
-                "node_id": node_id,
-                "summary": summary,
-                "created_at": event.get("created_at"),
-            }
-        )
+        entry = {
+            "id": event.get("id"),
+            "event_type": et,
+            "node_id": node_id,
+            "summary": summary,
+            "payload": payload,
+            "created_at": event.get("created_at"),
+        }
+        timeline.append(entry)
+        if node_id and node_id in node_details:
+            node_details[node_id].append(entry)
+        elif et == "plan_phase_executed":
+            for w in payload.get("workers") or []:
+                wid = f"worker_{w}"
+                if wid in node_details:
+                    node_details[wid].append(entry)
 
-        if node_id:
+        if node_id and et not in {"devlab_run_failed", "validation_failed"}:
             _mark_done_graph(states, node_id, PATH_A_ORDER)
 
     for wid in active_workers:
@@ -200,6 +239,11 @@ def build_graph_progress(
             states[nid] = "done"
         states["learner"] = "done"
 
+    if run_status in {"FAILED", "BLOCKED"}:
+        for nid in PATH_A_ORDER:
+            if states.get(nid) == "active":
+                states[nid] = "failed"
+
     nodes_out = []
     for meta in ARCHITECTURE_GRAPH["nodes"]:
         nid = meta["id"]
@@ -218,6 +262,8 @@ def build_graph_progress(
         "active_path": active_path,
         "run_status": run_status,
         "waiting_review": waiting_review,
+        "node_details": node_details,
+        "run_error": run_error,
     }
 
 

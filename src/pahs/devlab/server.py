@@ -79,6 +79,8 @@ def get_progress(run_id: str) -> dict[str, Any]:
         waiting_review=bool(snapshot.get("waiting_review")),
         active_path="A",
     )
+    if snapshot.get("error") and not progress.get("run_error"):
+        progress["run_error"] = snapshot["error"]
     return {"run_id": run_id, **progress, "snapshot": snapshot}
 
 

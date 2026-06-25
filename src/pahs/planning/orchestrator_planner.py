@@ -54,6 +54,17 @@ def plan_fallback_from_context(
     )
 
 
+_BAND_MAP = {"low": "simple", "high": "complex", "simple": "simple", "medium": "medium", "complex": "complex"}
+_PROFILE_MAP = {"simple": "lite", "lite": "lite", "full": "full"}
+
+
+def _normalize_plan_payload(payload: dict[str, Any]) -> None:
+    band = str(payload.get("complexity_band", "medium")).lower()
+    payload["complexity_band"] = _BAND_MAP.get(band, "medium")
+    profile = str(payload.get("orchestrator_profile", "lite")).lower()
+    payload["orchestrator_profile"] = _PROFILE_MAP.get(profile, "lite")
+
+
 def _parse_plan_json(raw: str, command: str) -> ExecutionPlan:
     start = raw.find("{")
     end = raw.rfind("}")
@@ -63,6 +74,7 @@ def _parse_plan_json(raw: str, command: str) -> ExecutionPlan:
     if "phases" not in payload:
         raise ValueError("Planner JSON missing phases")
     payload.setdefault("intent_summary", command[:240])
+    _normalize_plan_payload(payload)
     return ExecutionPlan.model_validate(payload)
 
 

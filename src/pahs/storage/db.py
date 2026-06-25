@@ -161,3 +161,39 @@ def list_pending_reviews() -> list[dict[str, Any]]:
             """
         ).fetchall()
     return [dict(row) for row in rows]
+
+
+def log_event(run_id: str, event_type: str, payload: dict[str, Any] | None = None) -> None:
+    with connect() as conn:
+        conn.execute(
+            """
+            INSERT INTO run_events (run_id, event_type, payload_json, created_at)
+            VALUES (?, ?, ?, ?)
+            """,
+            (
+                run_id,
+                event_type,
+                json.dumps(payload or {}, ensure_ascii=False),
+                utc_now(),
+            ),
+        )
+        conn.commit()
+
+
+def list_run_events(run_id: str) -> list[dict[str, Any]]:
+    with connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT * FROM run_events
+            WHERE run_id = ?
+            ORDER BY id ASC
+            """,
+            (run_id,),
+        ).fetchall()
+    results: list[dict[str, Any]] = []
+    for row in rows:
+        item = dict(row)
+        if item.get("payload_json"):
+            item["payload"] = json.loads(item["payload_json"])
+        results.append(item)
+    return results

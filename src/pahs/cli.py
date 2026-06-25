@@ -1,4 +1,4 @@
-"""PAHS command-line interface — Week 1."""
+"""PAHS command-line interface."""
 
 from __future__ import annotations
 
@@ -8,6 +8,7 @@ import typer
 
 from pahs.gateway.run_ids import new_run_id
 from pahs.graph.runner import resume_run, start_run
+from pahs.harness.rules import RuleEngine
 from pahs.storage import db
 
 app = typer.Typer(help="Personal Agent Harness System (PAHS)")
@@ -79,6 +80,31 @@ def reply(run_id: str, message: str) -> None:
         typer.echo("运行已完成。")
     else:
         typer.echo(json.dumps(result, ensure_ascii=False, indent=2, default=str))
+
+
+@app.command("events")
+def events(run_id: str) -> None:
+    """Show harness events for a run."""
+    db.init_db()
+    rows = db.list_run_events(run_id)
+    if not rows:
+        typer.echo("No events found.")
+        typer.echo("没有找到事件。")
+        raise typer.Exit(code=1)
+    typer.echo(json.dumps(rows, ensure_ascii=False, indent=2))
+
+
+@app.command("rules-show")
+def rules_show(scope: str = typer.Argument("global", help="global | creator")) -> None:
+    """Show which rule files would load for a scope."""
+    engine = RuleEngine()
+    if scope == "creator":
+        pack = engine.load_for_agent("creator")
+    else:
+        pack = engine.load_global()
+    typer.echo("Loaded rule files:")
+    for path in pack.paths:
+        typer.echo(f"- {path}")
 
 
 if __name__ == "__main__":

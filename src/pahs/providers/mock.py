@@ -15,10 +15,17 @@ def mock_triage(command: str) -> dict:
     if len(command) > 120:
         score += 15
 
+    if score < 40:
+        band = "simple"
+    elif score < 70:
+        band = "medium"
+    else:
+        band = "complex"
+
     profile = "full" if score >= 40 else "lite"
     return {
         "complexity_score": score,
-        "complexity_band": "simple" if score < 40 else "medium",
+        "complexity_band": band,
         "task_type": "research_report" if needs_research else "social_post",
         "risk_level": "low",
         "needs_research": needs_research,

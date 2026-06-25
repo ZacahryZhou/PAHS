@@ -33,3 +33,14 @@ CREATE TABLE IF NOT EXISTS user_channels (
 
 CREATE INDEX IF NOT EXISTS idx_review_queue_status ON review_queue(status);
 CREATE INDEX IF NOT EXISTS idx_runs_status ON runs(status);
+
+CREATE TABLE IF NOT EXISTS run_events (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  run_id TEXT NOT NULL,
+  event_type TEXT NOT NULL,
+  payload_json TEXT,
+  created_at TEXT NOT NULL,
+  FOREIGN KEY (run_id) REFERENCES runs(run_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_run_events_run_id ON run_events(run_id);

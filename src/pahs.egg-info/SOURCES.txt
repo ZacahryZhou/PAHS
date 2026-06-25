@@ -2,6 +2,7 @@ README.md
 pyproject.toml
 src/pahs/__init__.py
 src/pahs/cli.py
+src/pahs/config_loader.py
 src/pahs/paths.py
 src/pahs.egg-info/PKG-INFO
 src/pahs.egg-info/SOURCES.txt
@@ -21,6 +22,10 @@ src/pahs/graph/main.py
 src/pahs/graph/runner.py
 src/pahs/graph/state.py
 src/pahs/harness/__init__.py
+src/pahs/harness/budget.py
+src/pahs/harness/environment.py
+src/pahs/harness/rules.py
+src/pahs/harness/tools.py
 src/pahs/harness/validation.py
 src/pahs/providers/__init__.py
 src/pahs/providers/mock.py

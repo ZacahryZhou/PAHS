@@ -8,6 +8,7 @@ from langgraph.graph import END, StateGraph
 from langgraph.types import Command, interrupt
 
 from pahs.agents.executor import executor_node
+from pahs.agents.external import external_agent_node
 from pahs.agents.searcher import searcher_node
 from pahs.agents.week1 import creator_node, orchestrator_plan_node, triage_node
 from pahs.config_loader import budget_config
@@ -96,6 +97,8 @@ def env_precheck_node(state: PAHSState) -> dict:
 
 def worker_execute_node(state: PAHSState) -> dict:
     worker = state.get("worker", "creator")
+    if worker == "external":
+        return external_agent_node(state)
     if worker == "searcher":
         return searcher_node(state)
     if worker == "executor":

@@ -24,6 +24,8 @@ def route_model(routing_context: dict[str, Any], *, budget_alerts: list[str] | N
 
     if mode == "DEEP_THINK":
         role_key = "deep_think"
+    elif worker == "external":
+        role_key = "orchestrator_full"
     elif worker == "searcher":
         role_key = "searcher_summary"
     elif worker == "executor" and mode == "CODE":

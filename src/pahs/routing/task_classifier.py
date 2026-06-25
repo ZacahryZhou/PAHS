@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 from typing import Any
 
-from pahs.providers.mock import mock_triage
+from pahs.providers.router import triage_with_llm
 from pahs.routing.worker_router import choose_worker
 
 
@@ -28,6 +28,8 @@ class RoutingContext:
 
 
 def _task_type_from_triage(command: str, triage: dict[str, Any], worker: str) -> str:
+    if worker == "external":
+        return "external_task"
     if worker == "searcher":
         return "research_report"
     if worker == "executor":
@@ -41,8 +43,8 @@ def _task_type_from_triage(command: str, triage: dict[str, Any], worker: str) ->
     return "general_task"
 
 
-def classify_command(command: str) -> dict[str, Any]:
-    triage = mock_triage(command)
+def classify_command(command: str, *, run_id: str | None = None) -> dict[str, Any]:
+    triage = triage_with_llm(command, run_id=run_id)
     worker, execution_mode = choose_worker(command, triage)
     task_type = _task_type_from_triage(command, {**triage, "execution_mode": execution_mode}, worker)
     quality_required = "high" if triage.get("complexity_band") == "complex" else "standard"

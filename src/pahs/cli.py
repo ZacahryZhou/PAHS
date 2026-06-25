@@ -6,6 +6,10 @@ import json
 
 import typer
 
+from pahs.env import load_project_env
+
+load_project_env()
+
 from pahs.gateway.run_ids import new_run_id
 from pahs.graph.runner import resume_run, start_run
 from pahs.harness.budget import BudgetManager
@@ -20,8 +24,10 @@ from pahs.storage import db
 app = typer.Typer(help="Personal Agent Harness System (PAHS)")
 proposals_app = typer.Typer(help="Review Learner proposals.")
 tools_app = typer.Typer(help="Builder staging tools.")
+externals_app = typer.Typer(help="External local agents and bridges.")
 app.add_typer(proposals_app, name="proposals")
 app.add_typer(tools_app, name="tools")
+app.add_typer(externals_app, name="externals")
 
 
 @app.command("init-db")
@@ -128,10 +134,13 @@ def rules_show(scope: str = typer.Argument("global", help="global | creator | se
 @app.command("route-preview")
 def route_preview(command: str) -> None:
     """Preview routing, model choice, and cost estimate without running."""
+    from pahs.external.registry import match_external_agent
+
     classified = classify_command(command)
     routing = route_model(classified["routing_context"])
     cost = estimate_run_cost(classified["routing_context"], routing)
     standards = load_standards_for_task(classified["task_type"])
+    external = match_external_agent(command)
     payload = {
         "command": command,
         "task_type": classified["task_type"],
@@ -139,11 +148,20 @@ def route_preview(command: str) -> None:
         "orchestrator_profile": classified["orchestrator_profile"],
         "worker": classified["worker"],
         "execution_mode": classified["execution_mode"],
+        "external_match": external.name if external else None,
         "routing_decision": routing,
         "cost_estimate": cost,
         "standards_paths": standards["paths"],
     }
     typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
+
+
+@app.command("llm-status")
+def llm_status() -> None:
+    """Show whether PAHS will use DeepSeek or mock LLM."""
+    from pahs.providers.router import llm_status as status_payload
+
+    typer.echo(json.dumps(status_payload(), ensure_ascii=False, indent=2))
 
 
 @app.command("costs-today")
@@ -306,6 +324,36 @@ def tools_reject(
     typer.echo(json.dumps(result, ensure_ascii=False, indent=2))
     typer.echo("Rejected tool remains blocked from production.")
     typer.echo("已拒绝，生产环境仍不可调用。")
+
+
+@externals_app.command("list")
+def externals_list() -> None:
+    """List configured external agents."""
+    from pahs.external.registry import list_external_agents
+
+    rows = list_external_agents(enabled_only=False)
+    if not rows:
+        typer.echo("No external agents configured.")
+        typer.echo("没有配置外部 agent。")
+        return
+    for row in rows:
+        enabled = row.config.get("enabled", False)
+        typer.echo(
+            f"- {row.name} enabled={enabled} type={row.type} description={row.description}"
+        )
+
+
+@externals_app.command("test")
+def externals_test(agent_name: str, message: str) -> None:
+    """Call an external agent directly for debugging."""
+    from pahs.external.runner import run_external_agent
+
+    try:
+        result = run_external_agent(agent_name, message)
+    except Exception as exc:
+        typer.echo(str(exc))
+        raise typer.Exit(code=1) from exc
+    typer.echo(json.dumps(result, ensure_ascii=False, indent=2))
 
 
 @app.command("telegram")

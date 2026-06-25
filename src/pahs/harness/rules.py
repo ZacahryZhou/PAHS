@@ -18,6 +18,7 @@ AGENT_RULE_FILES = {
     "orchestrator": RULES_DIR / "agents" / "orchestrator.md",
     "creator": RULES_DIR / "agents" / "creator.md",
     "searcher": RULES_DIR / "agents" / "searcher.md",
+    "external": RULES_DIR / "agents" / "external.md",
 }
 
 MODE_RULE_FILES = {

@@ -25,6 +25,8 @@ class PAHSState(TypedDict, total=False):
     active_agent: str
     worker: str
     execution_mode: str | None
+    external_agent: str
+    external_result: dict[str, Any]
     sources: list[dict[str, Any]]
     tools_available: list[str]
     budget_snapshot: dict[str, Any]

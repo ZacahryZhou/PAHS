@@ -1,10 +1,11 @@
-"""Week 1/2 agent stubs with Week 4 routing-aware planning."""
+"""Week 1/2 agent stubs with Week 4+ routing and DeepSeek support."""
 
 from __future__ import annotations
 
 from pahs.config_loader import review_policy_for_band
 from pahs.graph.state import PAHSState
-from pahs.providers.mock import mock_creator_output, mock_plan
+from pahs.providers.mock import mock_plan
+from pahs.providers.router import llm_complete
 from pahs.routing.cost_estimator import estimate_run_cost, record_cost_event
 from pahs.routing.llm_router import route_model
 from pahs.routing.standards_loader import load_standards_for_task
@@ -13,7 +14,7 @@ from pahs.storage import db
 
 
 def triage_node(state: PAHSState) -> dict:
-    classified = classify_command(state["user_command"])
+    classified = classify_command(state["user_command"], run_id=state["run_id"])
     band = classified["complexity_band"]
     db.log_event(
         state["run_id"],
@@ -25,6 +26,9 @@ def triage_node(state: PAHSState) -> dict:
             "execution_mode": classified["execution_mode"],
         },
     )
+    external_agent = ""
+    if classified["worker"] == "external":
+        external_agent = classified["execution_mode"] or ""
     return {
         "triage_result": classified["triage_result"],
         "routing_context": classified["routing_context"],
@@ -33,6 +37,7 @@ def triage_node(state: PAHSState) -> dict:
         "complexity_band": band,
         "worker": classified["worker"],
         "execution_mode": classified["execution_mode"],
+        "external_agent": external_agent,
         "review_policy": review_policy_for_band(band),
     }
 
@@ -82,6 +87,7 @@ def orchestrator_plan_node(state: PAHSState) -> dict:
         "milestone_id": milestone["id"],
         "worker": worker,
         "execution_mode": execution_mode,
+        "external_agent": state.get("external_agent", ""),
         "routing_decision": routing_decision,
         "cost_estimate": cost_estimate,
         "standards_loaded": standards["paths"],
@@ -90,7 +96,17 @@ def orchestrator_plan_node(state: PAHSState) -> dict:
 
 
 def creator_node(state: PAHSState) -> dict:
-    output = mock_creator_output(state["user_command"])
+    model = (state.get("routing_decision") or {}).get("selected_model", "deepseek-chat")
+    output = llm_complete(
+        system=(
+            "You are PAHS Creator. Write the deliverable requested by the user. "
+            "Be clear, useful, and concise unless the user asks for length."
+        ),
+        user=state["user_command"],
+        model=model,
+        run_id=state["run_id"],
+        phase="creator",
+    )
     rules = state.get("loaded_rules", [])
     if rules:
         output += "\n\n[Harness] Loaded rules:\n- " + "\n- ".join(rules)
@@ -100,9 +116,7 @@ def creator_node(state: PAHSState) -> dict:
     standards = state.get("standards_loaded", [])
     if standards:
         output += "\n[Harness] Standards: " + ", ".join(standards)
-    model = (state.get("routing_decision") or {}).get("selected_model")
-    if model:
-        output += f"\n[Harness] Routed model: {model}"
+    output += f"\n[Harness] Routed model: {model}"
     return {
         "milestone_output": output,
         "status": "EXECUTED",

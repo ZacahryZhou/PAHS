@@ -24,6 +24,8 @@ def _stage1_5_heuristics(output: str, command: str) -> tuple[bool, str, float]:
     score = 0.5
     if "[mock creator output]" in output.lower():
         score += 0.2
+    if "[external agent:" in output.lower():
+        score += 0.25
     if any(token in command.lower() for token in command.split()[:3]):
         score += 0.15
     if len(output) >= 60:

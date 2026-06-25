@@ -31,3 +31,11 @@ def budget_config() -> dict[str, Any]:
 
 def models_config() -> dict[str, Any]:
     return load_yaml("models.yaml")
+
+
+def llm_config() -> dict[str, Any]:
+    return load_yaml("llm.yaml")
+
+
+def external_agents_config() -> dict[str, Any]:
+    return load_yaml("external_agents.yaml")

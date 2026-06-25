@@ -1,0 +1,36 @@
+# Register local agents/tools PAHS can delegate to.
+# 注册本机可被 PAHS 自动调用的外部 agent / 工具。
+
+external_agents:
+  openclaw:
+    enabled: true
+    type: openclaw
+    description: OpenClaw local agent (gateway or embedded)
+    binary: openclaw
+    default_agent: main
+    use_local: true
+    use_json: true
+    timeout_seconds: 600
+    match_keywords:
+      - openclaw
+      - open claw
+      - 用openclaw
+      - 调用openclaw
+      - 交给openclaw
+    match_prefixes:
+      - "@openclaw"
+      - "openclaw:"
+      - "claw:"
+
+  # Example shell bridge — enable and edit for your own project.
+  # shell_edusync:
+  #   enabled: false
+  #   type: shell
+  #   description: Run a command in EduSync project folder
+  #   working_directory: ~/Desktop/EduSync
+  #   command:
+  #     - bash
+  #     - -lc
+  #     - echo "TODO: wire your project CLI here: $PAHS_PROMPT"
+  #   match_keywords:
+  #     - edusync

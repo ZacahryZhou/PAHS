@@ -5,3 +5,4 @@ langgraph-checkpoint-sqlite>=2.0.0
 langchain-core>=0.3.0
 requests>=2.31.0
 python-telegram-bot>=21.0
+python-dotenv>=1.0.0

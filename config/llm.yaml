@@ -1,0 +1,9 @@
+llm:
+  # auto = use DeepSeek when DEEPSEEK_API_KEY is set, else mock
+  provider: auto
+  deepseek:
+    base_url: https://api.deepseek.com
+    chat_model: deepseek-chat
+    reasoner_model: deepseek-reasoner
+    timeout_seconds: 120
+    max_tokens: 4096

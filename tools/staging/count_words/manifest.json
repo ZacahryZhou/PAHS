@@ -1,0 +1,14 @@
+{
+  "name": "count_words",
+  "description": "tool that counts words in text",
+  "agent": "executor",
+  "status": "PENDING_REVIEW",
+  "requirement": "tool that counts words in text",
+  "created_at": "2026-06-25T00:31:33.945376+00:00",
+  "updated_at": "2026-06-25T00:31:33.963311+00:00",
+  "test_passed": true,
+  "test_output": "ok",
+  "reject_reason": null,
+  "sandbox": true,
+  "cost_per_call": 0.0
+}

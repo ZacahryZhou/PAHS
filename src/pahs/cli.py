@@ -19,7 +19,9 @@ from pahs.storage import db
 
 app = typer.Typer(help="Personal Agent Harness System (PAHS)")
 proposals_app = typer.Typer(help="Review Learner proposals.")
+tools_app = typer.Typer(help="Builder staging tools.")
 app.add_typer(proposals_app, name="proposals")
+app.add_typer(tools_app, name="tools")
 
 
 @app.command("init-db")
@@ -224,6 +226,86 @@ def proposals_reject(
     typer.echo(json.dumps(result, ensure_ascii=False, indent=2))
     typer.echo("Rejected proposal stored with reason.")
     typer.echo("已拒绝并保存原因。")
+
+
+@tools_app.command("staging")
+def tools_staging() -> None:
+    """List staged Builder tools."""
+    from pahs.builder.tool_manifest import list_staging_manifests
+
+    rows = list_staging_manifests()
+    if not rows:
+        typer.echo("No staged tools.")
+        typer.echo("没有 staging 工具。")
+        return
+    for row in rows:
+        typer.echo(
+            f"- {row.name} status={row.status} test_passed={row.test_passed} agent={row.agent}"
+        )
+
+
+@tools_app.command("draft")
+def tools_draft(
+    requirement: str,
+    agent: str = typer.Option("executor", "--agent", help="Target agent for the tool."),
+) -> None:
+    """Generate a staged tool and run sandbox tests (mock Builder)."""
+    from pahs.builder.builder import draft_tool
+
+    try:
+        manifest = draft_tool(requirement, agent=agent)
+    except ValueError as exc:
+        typer.echo(str(exc))
+        raise typer.Exit(code=1) from exc
+    typer.echo(json.dumps(manifest.to_dict(), ensure_ascii=False, indent=2))
+    typer.echo("Tool is in staging and NOT callable by Orchestrator until approved.")
+    typer.echo("工具已在 staging，批准前 Orchestrator 不能调用。")
+
+
+@tools_app.command("review")
+def tools_review(tool_name: str) -> None:
+    """Show staged tool code, tests, and manifest."""
+    from pahs.builder.review import review_tool
+
+    try:
+        payload = review_tool(tool_name)
+    except ValueError as exc:
+        typer.echo(str(exc))
+        raise typer.Exit(code=1) from exc
+    typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
+
+
+@tools_app.command("approve")
+def tools_approve(tool_name: str) -> None:
+    """Approve a staged tool and add it to the production registry."""
+    from pahs.builder.review import approve_tool
+
+    try:
+        result = approve_tool(tool_name)
+    except ValueError as exc:
+        typer.echo(str(exc))
+        raise typer.Exit(code=1) from exc
+    typer.echo(json.dumps(result, ensure_ascii=False, indent=2))
+    typer.echo("Approved tool is now available to future production runs.")
+    typer.echo("已批准，后续生产运行可调用该工具。")
+
+
+@tools_app.command("reject")
+def tools_reject(
+    tool_name: str,
+    reason: str = typer.Option(..., "--reason", "-r", help="Why this tool is rejected."),
+) -> None:
+    """Reject a staged tool."""
+    from pahs.builder.review import reject_tool
+
+    try:
+        result = reject_tool(tool_name, reason=reason)
+    except ValueError as exc:
+        typer.echo(str(exc))
+        raise typer.Exit(code=1) from exc
+    typer.echo(json.dumps(result, ensure_ascii=False, indent=2))
+    typer.echo("Rejected tool remains blocked from production.")
+    typer.echo("已拒绝，生产环境仍不可调用。")
 
 
 @app.command("telegram")

@@ -1,0 +1,13 @@
+{
+  "count_words": {
+    "name": "count_words",
+    "description": "tool that counts words in text",
+    "agent": "executor",
+    "status": "APPROVED",
+    "module_dir": "tools/builtin/count_words",
+    "function": "run",
+    "sandbox": true,
+    "cost_per_call": 0.0,
+    "approved_at": "2026-06-25T00:31:33.548095+00:00"
+  }
+}

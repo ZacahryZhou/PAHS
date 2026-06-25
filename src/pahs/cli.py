@@ -164,6 +164,78 @@ def llm_status() -> None:
     typer.echo(json.dumps(status_payload(), ensure_ascii=False, indent=2))
 
 
+@app.command("search-route-preview")
+def search_route_preview(
+    query: str,
+    user_task: str = typer.Option("", "--task", help="Full user task (defaults to query)"),
+) -> None:
+    """Preview smart search routing without calling search APIs."""
+    from pahs.env import load_project_env
+    from pahs.agents.search_router import route_search_task
+
+    load_project_env()
+    decision = route_search_task(query, user_task=user_task or query)
+    typer.echo(json.dumps(decision.to_dict(), ensure_ascii=False, indent=2))
+
+
+@app.command("search-test")
+def search_test(
+    query: str,
+    provider: str = typer.Option("", "--provider", help="Override provider for this test"),
+) -> None:
+    """Test step-1 web search (Perplexity / Tavily / mock) without full LangGraph run."""
+    from pahs.env import load_project_env
+    from pahs.agents.search_router import route_search_task
+    from pahs.tools.search_web import _resolve_provider, search_web
+
+    load_project_env()
+    mode = _resolve_provider()
+    typer.echo(f"Search mode setting: {mode}")
+
+    chosen = provider.strip() or None
+    if mode == "smart" and not chosen:
+        decision = route_search_task(query, user_task=query)
+        chosen = decision.provider
+        typer.echo(json.dumps({"route": decision.to_dict()}, ensure_ascii=False, indent=2))
+
+    result = search_web(query, provider=chosen)
+    typer.echo(json.dumps(result, ensure_ascii=False, indent=2, default=str))
+
+
+@app.command("search-status")
+def search_status() -> None:
+    """Show which search provider PAHS will use."""
+    import os
+
+    from pahs.env import load_project_env
+    from pahs.tools.search_web import _resolve_provider
+
+    load_project_env()
+    mode = _resolve_provider()
+    payload = {
+        "search_mode": mode,
+        "search_provider_setting": os.getenv("SEARCH_PROVIDER", "auto"),
+        "perplexity_api_key_set": bool(os.getenv("PERPLEXITY_API_KEY", "").strip()),
+        "perplexity_model": os.getenv("PERPLEXITY_MODEL", "sonar"),
+        "tavily_api_key_set": bool(os.getenv("TAVILY_API_KEY", "").strip()),
+        "search_route_use_llm": os.getenv("SEARCH_ROUTE_USE_LLM", "false"),
+    }
+    if mode == "smart":
+        payload["routing"] = (
+            "Searcher scores each query (simple → Tavily, deep research → Perplexity). "
+            "Set SEARCH_ROUTE_USE_LLM=true to refine gray-zone tasks with DeepSeek."
+        )
+    else:
+        payload["resolved_provider"] = mode if mode != "auto" else (
+            "perplexity"
+            if os.getenv("PERPLEXITY_API_KEY", "").strip()
+            else "tavily"
+            if os.getenv("TAVILY_API_KEY", "").strip()
+            else "mock"
+        )
+    typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
+
+
 @app.command("costs-today")
 def costs_today() -> None:
     """Show in-process daily budget counters (mock Week 4)."""

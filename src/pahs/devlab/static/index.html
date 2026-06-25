@@ -294,12 +294,14 @@
     }
     .timeline-row { cursor: pointer; padding: 1px 0; }
     .timeline-row:hover { color: #000; text-decoration: underline; }
+    .timeline-row.err { color: #c00; }
     .chat-panel.review-mode #messages {
       flex: 0 0 72px;
       max-height: 72px;
       opacity: 0.85;
     }
     .chat-panel.review-mode .review-box { flex: 1; }
+  </style>
 </head>
 <body>
   <header>
@@ -728,8 +730,10 @@
       }).then(() => connectStream(currentRunId));
     };
 
-    loadArchitecture();
-    loadHistory();
+    loadArchitecture().catch((e) => {
+      addMessage("error", "页面初始化失败: " + e.message);
+    });
+    loadHistory().catch(() => {});
     addMessage("system", "左侧=运行历史，点击可回看。Orchestrator 产出任务表后自动展示。点击架构节点看详情。");
   </script>
 </body>

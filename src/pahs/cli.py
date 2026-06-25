@@ -462,11 +462,25 @@ def dev_ui(
     port: int = typer.Option(8765, help="Bind port"),
 ) -> None:
     """Start local Dev Lab chat UI for testing (http://127.0.0.1:8765)."""
+    import socket
+
     from pahs.devlab.server import run_server
     from pahs.env import load_project_env
 
     load_project_env()
     db.init_db()
+
+    probe = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        probe.bind((host, port))
+    except OSError:
+        typer.echo(f"Port {port} is already in use.", err=True)
+        typer.echo(f"Stop the old server: lsof -ti:{port} | xargs kill -9", err=True)
+        typer.echo(f"Or use another port: pah dev-ui --port {port + 1}", err=True)
+        raise typer.Exit(code=1) from None
+    finally:
+        probe.close()
+
     url = f"http://{host}:{port}"
     typer.echo(f"PAHS Dev Lab running at {url}")
     typer.echo("Open this URL in your browser to chat and watch architecture progress.")

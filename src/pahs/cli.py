@@ -456,6 +456,74 @@ def externals_test(agent_name: str, message: str) -> None:
     typer.echo(json.dumps(result, ensure_ascii=False, indent=2))
 
 
+@app.command("dev-batch")
+def dev_batch(
+    runs: int = typer.Option(100, "--runs", "-n", help="Number of batch runs"),
+    mock: bool = typer.Option(
+        True,
+        "--mock/--no-mock",
+        help="Force mock LLM (recommended for 100x runs)",
+    ),
+    learner: bool = typer.Option(
+        True,
+        "--learner/--no-learner",
+        help="Feed synthetic final feedback to Learner",
+    ),
+    output: str | None = typer.Option(
+        None,
+        "--output",
+        "-o",
+        help="Markdown report path (default: data/dev_batch_report_<ts>.md)",
+    ),
+    scenario_file: str | None = typer.Option(
+        None,
+        "--scenarios",
+        help="Custom scenarios YAML path",
+    ),
+) -> None:
+    """Run automated Dev batch tests and write a defect report."""
+    from pathlib import Path
+
+    from pahs.devlab.batch_report import write_report
+    from pahs.devlab.batch_runner import run_batch, save_batch_json
+
+    db.init_db()
+    scenario_path = Path(scenario_file) if scenario_file else None
+    output_path = Path(output) if output else None
+
+    typer.echo(f"Starting dev batch: {runs} runs (mock={mock}, learner={learner})")
+    typer.echo(f"开始批量测试：{runs} 次（mock={mock}, learner={learner}）")
+
+    def on_progress(done: int, total: int, summary: object) -> None:
+        status = getattr(summary, "status", "?")
+        scenario_id = getattr(summary, "scenario_id", "?")
+        typer.echo(f"[{done}/{total}] {scenario_id} -> {status}")
+
+    result = run_batch(
+        runs=runs,
+        mock_llm=mock,
+        with_learner=learner,
+        scenario_file=scenario_path,
+        on_progress=on_progress,
+    )
+
+    report_path = write_report(result, output_path)
+    json_path = save_batch_json(
+        result,
+        report_path.with_suffix(".json"),
+    )
+
+    completed = sum(1 for item in result.summaries if item.status == "COMPLETED")
+    defective = sum(1 for item in result.summaries if item.defects)
+    typer.echo("")
+    typer.echo(f"Done. Completed {completed}/{runs}, defective {defective}/{runs}")
+    typer.echo(f"完成。成功 {completed}/{runs}，有缺陷 {defective}/{runs}")
+    typer.echo(f"Report: {report_path}")
+    typer.echo(f"JSON:   {json_path}")
+    typer.echo("")
+    typer.echo("Copy the 'Copy-Paste Handoff' section from the report back to your agent.")
+
+
 @app.command("dev-ui")
 def dev_ui(
     host: str = typer.Option("127.0.0.1", help="Bind host"),

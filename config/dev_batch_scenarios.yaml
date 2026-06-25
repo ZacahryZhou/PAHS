@@ -1,0 +1,47 @@
+# Dev batch test corpus — rotated until --runs count is reached.
+scenarios:
+  - id: search_coffee
+    category: searcher
+    command: "帮我搜索咖啡热点和趋势"
+  - id: research_ai
+    category: searcher
+    command: "调研 2025 年个人 AI agent 框架对比"
+  - id: creator_social
+    category: creator
+    command: "写一条关于周末咖啡探店的 IG 文案"
+  - id: creator_short
+    category: creator
+    command: "写一段 100 字产品介绍，语气轻松"
+  - id: account_signup
+    category: capability_gap
+    command: "帮我开通 B 站视频账号并完成实名"
+  - id: account_manage
+    category: capability_gap
+    command: "帮我管理抖音账号并每天发帖"
+  - id: direct_publish
+    category: capability_gap
+    command: "直接把这条文案发布到 Instagram"
+  - id: payment
+    category: capability_gap
+    command: "帮我绑卡并完成订阅付款"
+  - id: multi_step_plan
+    category: orchestrator
+    command: "先调研竞品，再写推广方案，最后出执行清单"
+  - id: code_task
+    category: creator
+    command: "解释如何用 Python 写一个简单爬虫"
+  - id: concise_output
+    category: creator
+    command: "用三句话总结 PAHS 是什么"
+  - id: official_docs
+    category: searcher
+    command: "查找 LangGraph 官方文档并总结核心概念"
+  - id: parallel_hint
+    category: orchestrator
+    command: "同时调研三家咖啡品牌并对比定价"
+  - id: review_heavy
+    category: creator
+    command: "写一份需要分阶段审核的品牌故事草稿"
+  - id: external_pip
+    category: external
+    command: "生成一条 15 秒产品宣传短视频脚本"

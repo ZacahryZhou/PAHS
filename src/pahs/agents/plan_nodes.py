@@ -69,14 +69,17 @@ def execute_plan_phase_node(state: PAHSState) -> dict:
     result = execute_phase(state, plan, phase_index)
     result["plan_progress"] = format_plan_progress(plan, phase_index)
 
+    phase = plan.phases[phase_index]
     db.log_event(
         state["run_id"],
         "plan_phase_executed",
         {
             "phase_index": phase_index,
-            "phase_id": plan.phases[phase_index].id,
-            "parallel": plan.phases[phase_index].parallel,
-            "task_ids": [task.id for task in plan.phases[phase_index].tasks],
+            "phase_id": phase.id,
+            "parallel": phase.parallel,
+            "task_ids": [task.id for task in phase.tasks],
+            "workers": [task.worker for task in phase.tasks],
+            "worker": result.get("worker"),
             "progress": result.get("plan_progress"),
         },
     )

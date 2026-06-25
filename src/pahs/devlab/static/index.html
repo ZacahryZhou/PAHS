@@ -6,18 +6,15 @@
   <title>PAHS Dev Lab</title>
   <style>
     :root {
-      --bg: #ffffff;
-      --panel: #fafafa;
-      --border: #d4d4d4;
-      --text: #0a0a0a;
-      --muted: #737373;
-      --active-bg: #f5f5f5;
-      --waiting-bg: #ebebeb;
+      --bg: #fff;
+      --border: #ccc;
+      --text: #000;
+      --muted: #666;
     }
     * { box-sizing: border-box; }
     body {
       margin: 0;
-      font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+      font-family: system-ui, sans-serif;
       background: var(--bg);
       color: var(--text);
       height: 100vh;
@@ -25,32 +22,38 @@
       flex-direction: column;
     }
     header {
-      padding: 12px 20px;
+      padding: 10px 16px;
       border-bottom: 1px solid var(--border);
       display: flex;
-      align-items: center;
       justify-content: space-between;
-      background: var(--panel);
+      align-items: center;
+      font-size: 0.9rem;
     }
-    header h1 { margin: 0; font-size: 1rem; font-weight: 600; letter-spacing: 0.02em; }
-    header .meta { font-size: 0.78rem; color: var(--muted); font-family: ui-monospace, monospace; }
+    header h1 { margin: 0; font-size: 1rem; font-weight: 600; }
+    header .meta { font-family: monospace; font-size: 0.75rem; color: var(--muted); }
     main {
       flex: 1;
       display: grid;
-      grid-template-columns: 1fr 400px;
+      grid-template-columns: 1fr 1fr;
       min-height: 0;
     }
-    .chat-panel, .progress-panel {
+    .chat-panel {
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid var(--border);
+      min-height: 0;
+    }
+    .graph-panel {
       display: flex;
       flex-direction: column;
       min-height: 0;
+      background: #fafafa;
     }
-    .chat-panel { border-right: 1px solid var(--border); }
     .panel-title {
-      padding: 10px 16px;
-      font-size: 0.7rem;
+      padding: 8px 12px;
+      font-size: 0.65rem;
       text-transform: uppercase;
-      letter-spacing: 0.08em;
+      letter-spacing: 0.1em;
       color: var(--muted);
       border-bottom: 1px solid var(--border);
       font-weight: 600;
@@ -58,156 +61,107 @@
     #messages {
       flex: 1;
       overflow-y: auto;
-      padding: 16px;
+      padding: 12px;
       display: flex;
       flex-direction: column;
-      gap: 10px;
+      gap: 8px;
     }
     .msg {
-      max-width: 88%;
-      padding: 10px 14px;
-      border-radius: 6px;
-      line-height: 1.55;
-      font-size: 0.88rem;
+      max-width: 90%;
+      padding: 8px 12px;
+      font-size: 0.85rem;
+      line-height: 1.5;
       white-space: pre-wrap;
-      word-break: break-word;
+      border-radius: 4px;
     }
-    .msg.user {
-      align-self: flex-end;
-      background: #0a0a0a;
-      color: #fff;
-    }
-    .msg.assistant {
-      align-self: flex-start;
-      background: var(--panel);
-      border: 1px solid var(--border);
-    }
-    .msg.system {
-      align-self: center;
-      color: var(--muted);
-      font-size: 0.78rem;
-      padding: 2px;
-    }
+    .msg.user { align-self: flex-end; background: #000; color: #fff; }
+    .msg.assistant { align-self: flex-start; border: 1px solid var(--border); }
+    .msg.system { align-self: center; color: var(--muted); font-size: 0.75rem; }
     .composer {
-      padding: 12px 16px;
+      padding: 10px 12px;
       border-top: 1px solid var(--border);
       display: flex;
       gap: 8px;
-      flex-wrap: wrap;
-      background: var(--panel);
     }
     textarea {
       flex: 1;
-      min-width: 200px;
-      min-height: 44px;
-      max-height: 120px;
+      min-height: 40px;
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      padding: 8px;
+      font: inherit;
       resize: vertical;
-      background: #fff;
-      border: 1px solid var(--border);
-      border-radius: 4px;
-      color: var(--text);
-      padding: 10px 12px;
-      font: inherit;
     }
-    textarea:focus { outline: 2px solid #0a0a0a; outline-offset: 0; }
     button {
-      background: #0a0a0a;
+      background: #000;
       color: #fff;
-      border: 1px solid #0a0a0a;
-      border-radius: 4px;
-      padding: 10px 16px;
-      font: inherit;
+      border: none;
+      padding: 8px 14px;
+      border-radius: 3px;
       cursor: pointer;
-      font-weight: 500;
+      font: inherit;
     }
-    button:disabled { opacity: 0.4; cursor: not-allowed; }
-    button.secondary {
-      background: #fff;
-      color: #0a0a0a;
-    }
-    #progress-nodes {
+    button:disabled { opacity: 0.35; }
+    button.secondary { background: #fff; color: #000; border: 1px solid #000; }
+    #graph-wrap {
       flex: 1;
-      overflow-y: auto;
-      padding: 10px 12px;
+      overflow: auto;
+      padding: 8px;
+    }
+    #arch-svg {
+      width: 100%;
+      min-width: 400px;
+      height: auto;
+      display: block;
+    }
+    .path-legend {
       display: flex;
-      flex-direction: column;
-      gap: 4px;
-    }
-    .node {
-      display: grid;
-      grid-template-columns: 14px 1fr auto;
-      align-items: center;
-      gap: 10px;
-      padding: 8px 10px;
-      border: 1px solid var(--border);
-      background: #fff;
-      font-size: 0.8rem;
-    }
-    .node .dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      border: 1px solid #a3a3a3;
-      background: #fff;
-    }
-    .node.pending .dot { background: #fff; }
-    .node.active { background: var(--active-bg); border-color: #0a0a0a; border-width: 2px; }
-    .node.active .dot { background: #0a0a0a; border-color: #0a0a0a; }
-    .node.done .dot { background: #0a0a0a; border-color: #0a0a0a; }
-    .node.waiting { background: var(--waiting-bg); border-style: dashed; }
-    .node.waiting .dot { background: #737373; }
-    .node.failed { border-color: #0a0a0a; opacity: 0.5; text-decoration: line-through; }
-    .node-label { font-weight: 500; }
-    .node-layer {
-      font-size: 0.68rem;
-      color: var(--muted);
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-    }
-    .node-status {
-      font-size: 0.68rem;
-      color: var(--muted);
-      font-family: ui-monospace, monospace;
-      text-transform: uppercase;
-    }
-  .arch-hint {
-      padding: 8px 12px;
-      font-size: 0.72rem;
-      color: var(--muted);
-      border-bottom: 1px solid var(--border);
-      line-height: 1.4;
-    }
-    #timeline {
-      max-height: 140px;
-      overflow-y: auto;
-      border-top: 1px solid var(--border);
-      padding: 8px 12px;
+      gap: 16px;
+      padding: 6px 12px;
       font-size: 0.7rem;
       color: var(--muted);
-      font-family: ui-monospace, monospace;
-      background: var(--panel);
+      border-bottom: 1px solid var(--border);
     }
-    #timeline div { padding: 2px 0; border-bottom: 1px solid #eee; }
-    .review-box { width: 100%; padding: 8px 16px 0; display: none; }
+    .path-legend span.active { color: #000; font-weight: 600; }
+    #timeline {
+      max-height: 100px;
+      overflow-y: auto;
+      padding: 6px 12px;
+      font-size: 0.65rem;
+      font-family: monospace;
+      color: var(--muted);
+      border-top: 1px solid var(--border);
+      background: #fff;
+    }
+    .review-box { display: none; padding: 8px 12px 0; }
     .review-box.visible { display: block; }
     .review-preview {
-      background: #fff;
       border: 1px dashed var(--border);
-      padding: 10px;
+      padding: 8px;
       font-size: 0.8rem;
-      max-height: 160px;
+      max-height: 120px;
       overflow-y: auto;
-      margin-bottom: 8px;
       white-space: pre-wrap;
+      margin-bottom: 8px;
     }
+    /* SVG node styles via classes */
+    .g-node rect { stroke: #999; stroke-width: 1; fill: #fff; transition: all 0.2s; }
+    .g-node.idle rect { fill: #f5f5f5; stroke: #ddd; opacity: 0.55; }
+    .g-node.pending rect { fill: #fff; stroke: #bbb; }
+    .g-node.active rect { fill: #fff; stroke: #000; stroke-width: 2.5; }
+    .g-node.done rect { fill: #000; stroke: #000; }
+    .g-node.done text { fill: #fff !important; }
+    .g-node.done .sub { fill: #ccc !important; }
+    .g-node.waiting rect { fill: #fff; stroke: #000; stroke-dasharray: 4 2; }
+    .g-edge { stroke: #bbb; stroke-width: 1; fill: none; }
+    .g-edge.path-b { stroke: #ddd; stroke-dasharray: 5 3; }
+    .g-edge.active { stroke: #000; stroke-width: 1.5; }
   </style>
 </head>
 <body>
   <header>
     <h1>PAHS Dev Lab</h1>
-    <div class="meta">
-      <span id="run-label">idle</span> · <span id="status-label">ready</span>
-    </div>
+    <div class="meta"><span id="run-label">idle</span> · <span id="status-label">ready</span></div>
   </header>
   <main>
     <section class="chat-panel">
@@ -216,26 +170,31 @@
       <div class="review-box" id="review-box">
         <div class="review-preview" id="review-preview"></div>
         <div class="composer">
-          <textarea id="review-input" placeholder="修改意见，或点通过"></textarea>
+          <textarea id="review-input" placeholder="修改意见"></textarea>
           <button type="button" class="secondary" id="approve-btn">通过</button>
-          <button type="button" class="secondary" id="reply-btn">提交修改</button>
+          <button type="button" class="secondary" id="reply-btn">提交</button>
         </div>
       </div>
       <div class="composer" id="main-composer">
-        <textarea id="input" placeholder="发命令测试；输入「架构」只查看右侧流程图"></textarea>
+        <textarea id="input" placeholder="测试命令；输入「架构」查看说明"></textarea>
         <button type="button" id="send-btn">发送</button>
       </div>
     </section>
-    <section class="progress-panel">
-      <div class="panel-title">Architecture · Path A</div>
-      <div class="arch-hint">打开页面即显示完整 LangGraph 流水线。发送命令后节点会实时高亮。</div>
-      <div id="progress-nodes"></div>
-      <div id="timeline"></div>
+    <section class="graph-panel">
+      <div class="panel-title">Global Architecture</div>
+      <div class="path-legend">
+        <span id="leg-a" class="active">Path A — LangGraph 完整团队</span>
+        <span id="leg-b">Path B — Telegram 直达 SMAS/PIP</span>
+      </div>
+      <div id="graph-wrap">
+        <svg id="arch-svg" viewBox="0 0 820 720" xmlns="http://www.w3.org/2000/svg"></svg>
+      </div>
+      <div id="timeline">事件时间线</div>
     </section>
   </main>
   <script>
+    const svg = document.getElementById("arch-svg");
     const messagesEl = document.getElementById("messages");
-    const progressNodesEl = document.getElementById("progress-nodes");
     const timelineEl = document.getElementById("timeline");
     const inputEl = document.getElementById("input");
     const sendBtn = document.getElementById("send-btn");
@@ -244,228 +203,180 @@
     const reviewBox = document.getElementById("review-box");
     const reviewPreview = document.getElementById("review-preview");
     const reviewInput = document.getElementById("review-input");
-    const approveBtn = document.getElementById("approve-btn");
-    const replyBtn = document.getElementById("reply-btn");
     const mainComposer = document.getElementById("main-composer");
 
     let currentRunId = null;
     let eventSource = null;
     let pollTimer = null;
+    let graphMeta = { nodes: [], edges: [] };
 
-    const ARCH_HELP =
-      "PAHS Path A 完整架构（右侧已列出全部节点）：\n\n" +
-      "用户输入 → Ingest → Global Rules → Triage → Orchestrator（写 ExecutionPlan）\n" +
-      "→ Plan Validate → Env/Budget → Target Rules → Execute Phase（可并行 Task）\n" +
-      "→ Search Router（仅 Searcher）→ Verify → 人工审核 → 最终交付 → Learner\n\n" +
-      "Telegram 发 IG/视频 走 Path B 直达 SMAS/PIP，不经过此图。";
-
-    function isArchQuery(text) {
-      return /^(目前)?架构$|^architecture$|^流程$|^pipeline$/i.test(text.trim());
+    function isArchQuery(t) {
+      return /^(目前)?架构$|^architecture$|^流程$/i.test(t.trim());
     }
 
     function addMessage(role, text) {
       const el = document.createElement("div");
-      el.className = `msg ${role}`;
+      el.className = "msg " + role;
       el.textContent = text;
       messagesEl.appendChild(el);
       messagesEl.scrollTop = messagesEl.scrollHeight;
     }
 
-    function renderNodes(progress) {
-      if (!progress || !Array.isArray(progress.nodes) || progress.nodes.length === 0) {
-        progressNodesEl.innerHTML = '<div class="arch-hint">无法加载架构节点</div>';
-        return;
-      }
-      progressNodesEl.innerHTML = "";
-      progress.nodes.forEach((node) => {
-        const el = document.createElement("div");
-        el.className = `node ${node.status || "pending"}`;
-        el.innerHTML = `
-          <div class="dot"></div>
-          <div class="node-label">${node.label_zh || node.label}</div>
-          <div class="node-status">${node.status || "pending"}</div>`;
-        const layer = document.createElement("div");
-        layer.className = "node-layer";
-        layer.style.gridColumn = "2 / -1";
-        layer.textContent = node.layer || "";
-        el.appendChild(layer);
-        progressNodesEl.appendChild(el);
-      });
+    function nodeCenter(n) {
+      return { x: n.x + n.w / 2, y: n.y + n.h / 2 };
     }
 
-    function renderTimeline(progress) {
-      if (!progress || !progress.timeline || progress.timeline.length === 0) {
-        timelineEl.innerHTML = '<div>事件时间线（运行后出现）</div>';
+    function renderGraph(data) {
+      if (!data || !data.nodes) return;
+      graphMeta.nodes = data.nodes;
+      graphMeta.edges = data.edges || data.graph?.edges || [];
+      const nodeMap = {};
+      data.nodes.forEach((n) => { nodeMap[n.id] = n; });
+
+      const doneSet = new Set(data.nodes.filter((n) => n.status === "done").map((n) => n.id));
+      const activeId = data.active_node;
+
+      let svgHtml = '<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#999"/></marker></defs>';
+
+      graphMeta.edges.forEach((e) => {
+        const a = nodeMap[e.from];
+        const b = nodeMap[e.to];
+        if (!a || !b) return;
+        const ca = nodeCenter(a);
+        const cb = nodeCenter(b);
+        const onPath = e.path === "B" ? "path-b" : "";
+        const lit = doneSet.has(e.from) && (doneSet.has(e.to) || b.id === activeId) ? " active" : "";
+        svgHtml += `<line class="g-edge ${onPath}${lit}" x1="${ca.x}" y1="${ca.y + a.h/2}" x2="${cb.x}" y2="${cb.y - b.h/2}" marker-end="url(#arrow)"/>`;
+      });
+
+      data.nodes.forEach((n) => {
+        const st = n.status || "pending";
+        const cx = n.x + n.w / 2;
+        svgHtml += `<g class="g-node ${st}" data-id="${n.id}">`;
+        svgHtml += `<rect x="${n.x}" y="${n.y}" width="${n.w}" height="${n.h}" rx="3"/>`;
+        svgHtml += `<text x="${cx}" y="${n.y + 14}" text-anchor="middle" font-size="10" font-weight="600" fill="#000">${n.label}</text>`;
+        svgHtml += `<text class="sub" x="${cx}" y="${n.y + 26}" text-anchor="middle" font-size="8" fill="#666">${n.sublabel || ""}</text>`;
+        if (st === "active") {
+          svgHtml += `<text x="${n.x + n.w - 4}" y="${n.y + 10}" text-anchor="end" font-size="7" fill="#000">●</text>`;
+        }
+        svgHtml += "</g>";
+      });
+
+      // Path labels
+      svgHtml += `<text x="120" y="88" font-size="9" fill="#999" text-anchor="middle">Path B</text>`;
+      svgHtml += `<text x="400" y="88" font-size="9" fill="#000" text-anchor="middle" font-weight="600">Path A</text>`;
+
+      svg.innerHTML = svgHtml;
+
+      if (activeId && nodeMap[activeId]) {
+        const n = nodeMap[activeId];
+        const g = svg.querySelector(`[data-id="${activeId}"]`);
+        if (g) g.parentElement && document.getElementById("graph-wrap").scrollTo({
+          top: Math.max(0, n.y - 80), behavior: "smooth"
+        });
+      }
+    }
+
+    function renderTimeline(data) {
+      const tl = data.timeline || [];
+      if (!tl.length) {
+        timelineEl.textContent = "运行后此处显示事件流";
         return;
       }
-      timelineEl.innerHTML = progress.timeline.slice(-14).map((item) =>
-        `<div>${(item.created_at || "").slice(11, 19)} ${item.summary || item.event_type}</div>`
+      timelineEl.innerHTML = tl.slice(-10).map((e) =>
+        `<div>${(e.created_at || "").slice(11, 19)} [${e.node_id || "-"}] ${e.summary}</div>`
       ).join("");
     }
 
     async function loadArchitecture() {
-      try {
-        const res = await fetch("/api/architecture");
-        if (!res.ok) throw new Error("bad status");
-        const data = await res.json();
-        renderNodes(data);
-        renderTimeline(data);
-      } catch (e) {
-        progressNodesEl.innerHTML = '<div class="arch-hint">加载失败，请重启 pah dev-ui</div>';
-      }
+      const res = await fetch("/api/architecture");
+      const data = await res.json();
+      renderGraph(data);
+      renderTimeline(data);
     }
 
-    function setReviewMode(snapshot) {
-      const waiting = snapshot && snapshot.waiting_review;
-      if (waiting) {
+    function setReviewMode(snap) {
+      if (snap && snap.waiting_review) {
         reviewBox.classList.add("visible");
         mainComposer.style.display = "none";
-        reviewPreview.textContent = snapshot.interrupt_message || "(等待审核)";
-        statusLabel.textContent = snapshot.review_type || "AWAITING_REVIEW";
+        reviewPreview.textContent = snap.interrupt_message || "";
+        statusLabel.textContent = snap.status;
       } else {
         reviewBox.classList.remove("visible");
         mainComposer.style.display = "flex";
       }
     }
 
-    function stopPolling() {
-      if (pollTimer) {
-        clearInterval(pollTimer);
-        pollTimer = null;
-      }
-    }
-
     function startPolling(runId) {
-      stopPolling();
+      if (pollTimer) clearInterval(pollTimer);
       pollTimer = setInterval(async () => {
-        try {
-          const res = await fetch(`/api/runs/${runId}/progress`);
-          if (!res.ok) return;
-          const data = await res.json();
-          renderNodes(data);
-          renderTimeline(data);
-          if (data.snapshot) {
-            runLabel.textContent = data.snapshot.run_id;
-            statusLabel.textContent = data.snapshot.status;
-            setReviewMode(data.snapshot);
-          }
-          const st = data.snapshot && data.snapshot.status;
-          if (st === "COMPLETED" || st === "FAILED" || st === "BLOCKED") {
-            if (!data.snapshot.waiting_review) {
-              stopPolling();
-              sendBtn.disabled = false;
-            }
-          }
-        } catch (e) { /* ignore */ }
-      }, 500);
+        const res = await fetch("/api/runs/" + runId + "/progress");
+        const data = await res.json();
+        renderGraph(data);
+        renderTimeline(data);
+        if (data.snapshot) {
+          runLabel.textContent = data.snapshot.run_id;
+          statusLabel.textContent = data.snapshot.status;
+          setReviewMode(data.snapshot);
+        }
+      }, 400);
     }
 
     function connectStream(runId) {
       if (eventSource) eventSource.close();
       startPolling(runId);
-
-      eventSource = new EventSource(`/api/runs/${runId}/events/stream`);
+      eventSource = new EventSource("/api/runs/" + runId + "/events/stream");
       eventSource.onmessage = (ev) => {
-        let data;
-        try { data = JSON.parse(ev.data); } catch { return; }
-        if (data.done) {
-          eventSource.close();
-          sendBtn.disabled = false;
-          return;
-        }
-        if (data.progress) {
-          renderNodes(data.progress);
-          renderTimeline(data.progress);
-        }
-        if (data.snapshot) {
-          runLabel.textContent = data.snapshot.run_id;
-          statusLabel.textContent = data.snapshot.status;
-          setReviewMode(data.snapshot);
-          if (data.snapshot.waiting_review && data.snapshot.interrupt_message) {
-            const last = messagesEl.lastElementChild;
-            if (!last || !last.dataset.review) {
-              addMessage("assistant", data.snapshot.interrupt_message);
-              messagesEl.lastElementChild.dataset.review = "1";
-            }
-          }
-        }
-        (data.events || []).forEach((event) => {
-          if (event.event_type === "devlab_run_completed") {
-            addMessage("system", "Run completed.");
-          }
-          if (event.event_type === "devlab_run_failed") {
-            addMessage("system", "Run failed: " + ((event.payload && event.payload.error) || "unknown"));
-          }
-        });
-      };
-      eventSource.onerror = () => {
-        eventSource.close();
-        /* polling keeps working */
+        const data = JSON.parse(ev.data);
+        if (data.done) { eventSource.close(); sendBtn.disabled = false; return; }
+        if (data.progress) { renderGraph(data.progress); renderTimeline(data.progress); }
+        if (data.snapshot) setReviewMode(data.snapshot);
       };
     }
 
     async function sendChat() {
       const text = inputEl.value.trim();
       if (!text) return;
-
       if (isArchQuery(text)) {
         addMessage("user", text);
-        addMessage("assistant", ARCH_HELP);
+        addMessage("assistant", "右侧为全局架构图：\n· Path A（中）Dev Lab / pah run 走完整 LangGraph\n· Path B（左）Telegram IG/视频 直达 SMAS/PIP\n· Execute Phase 下分岔到 Searcher/Creator/Executor/External\n运行命令后节点会实时变黑高亮。");
         inputEl.value = "";
-        await loadArchitecture();
+        loadArchitecture();
         return;
       }
-
       sendBtn.disabled = true;
       addMessage("user", text);
       inputEl.value = "";
-
-      try {
-        const res = await fetch("/api/chat", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ message: text }),
-        });
-        const data = await res.json();
-        currentRunId = data.run_id;
-        runLabel.textContent = currentRunId;
-        statusLabel.textContent = data.status || "ACTIVE";
-        addMessage("system", "Run started: " + currentRunId);
-        connectStream(currentRunId);
-      } catch (e) {
-        addMessage("system", "启动失败: " + e.message);
-        sendBtn.disabled = false;
-      }
-    }
-
-    async function sendReply(message) {
-      if (!currentRunId) return;
-      sendBtn.disabled = true;
-      addMessage("user", message);
-      await fetch(`/api/runs/${currentRunId}/reply`, {
+      const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message }),
+        body: JSON.stringify({ message: text }),
       });
-      messagesEl.querySelectorAll("[data-review]").forEach((el) => el.removeAttribute("data-review"));
+      const data = await res.json();
+      currentRunId = data.run_id;
+      runLabel.textContent = currentRunId;
+      addMessage("system", "Run: " + currentRunId);
       connectStream(currentRunId);
     }
 
-    sendBtn.addEventListener("click", sendChat);
-    inputEl.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" && !e.shiftKey) {
-        e.preventDefault();
-        sendChat();
-      }
-    });
-    approveBtn.addEventListener("click", () => sendReply("approved"));
-    replyBtn.addEventListener("click", () => {
-      const text = reviewInput.value.trim();
-      if (text) sendReply(text);
-    });
+    document.getElementById("send-btn").onclick = sendChat;
+    inputEl.onkeydown = (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendChat(); } };
+    document.getElementById("approve-btn").onclick = () => {
+      fetch("/api/runs/" + currentRunId + "/reply", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: "approved" }),
+      }).then(() => connectStream(currentRunId));
+    };
+    document.getElementById("reply-btn").onclick = () => {
+      const t = reviewInput.value.trim();
+      if (t) fetch("/api/runs/" + currentRunId + "/reply", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: t }),
+      }).then(() => connectStream(currentRunId));
+    };
 
     loadArchitecture();
-    addMessage("system", "Dev Lab ready — 右侧为完整架构；输入「架构」查看说明。");
+    addMessage("system", "右侧 = 全局架构图（Path A + Path B）。发命令可看实时进度。");
   </script>
 </body>
 </html>

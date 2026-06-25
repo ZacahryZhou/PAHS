@@ -12,7 +12,7 @@ from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from pahs.devlab.architecture_map import build_progress, default_progress
+from pahs.devlab.architecture_graph import build_graph_progress, default_graph_progress
 from pahs.devlab.run_manager import get_handle, resume_run_async, run_snapshot, start_run_async
 from pahs.storage import db
 
@@ -41,11 +41,10 @@ def index() -> FileResponse:
 
 @app.get("/api/architecture")
 def get_architecture_template() -> dict[str, Any]:
-    """Return full PAHS Path A pipeline (idle) for Dev Lab right panel."""
-    progress = default_progress()
+    """Return global Path A + Path B architecture graph (idle)."""
+    progress = default_graph_progress()
     return {
-        "description": "PAHS Path A — LangGraph full team pipeline",
-        "path_b_note": "Telegram SMAS/PIP shortcut bypasses this graph",
+        "description": "PAHS global architecture — Path A (LangGraph) + Path B (Telegram direct)",
         **progress,
     }
 
@@ -74,10 +73,11 @@ def get_progress(run_id: str) -> dict[str, Any]:
     if snapshot.get("error") == "not_found":
         raise HTTPException(status_code=404, detail="Run not found")
     events = db.list_run_events(run_id)
-    progress = build_progress(
+    progress = build_graph_progress(
         events,
         run_status=str(snapshot.get("status") or ""),
         waiting_review=bool(snapshot.get("waiting_review")),
+        active_path="A",
     )
     return {"run_id": run_id, **progress, "snapshot": snapshot}
 
@@ -113,10 +113,11 @@ async def stream_events(run_id: str, after_id: int = 0) -> StreamingResponse:
             events = db.list_run_events(run_id)
             new_events = [event for event in events if int(event.get("id", 0)) > cursor]
             snapshot = run_snapshot(run_id)
-            progress = build_progress(
+            progress = build_graph_progress(
                 events,
                 run_status=str(snapshot.get("status") or ""),
                 waiting_review=bool(snapshot.get("waiting_review")),
+                active_path="A",
             )
 
             if new_events or idle_ticks == 0:

@@ -9,6 +9,20 @@ from langgraph.types import Command
 from pahs.graph.main import build_graph, graph_config
 from pahs.storage import db
 
+_CACHED_GRAPH = None
+
+
+def _get_graph():
+    global _CACHED_GRAPH
+    if _CACHED_GRAPH is None:
+        _CACHED_GRAPH = build_graph()
+    return _CACHED_GRAPH
+
+
+def reset_graph_cache() -> None:
+    global _CACHED_GRAPH
+    _CACHED_GRAPH = None
+
 
 def _extract_interrupts(result: dict[str, Any]) -> list[Any]:
     interrupts = result.get("__interrupt__")
@@ -33,7 +47,7 @@ def _sync_review_queue(run_id: str, interrupt_value: dict[str, Any]) -> None:
 
 
 def start_run(run_id: str, command: str, *, channel: str = "cli") -> dict[str, Any]:
-    graph = build_graph()
+    graph = _get_graph()
     config = graph_config(run_id)
 
     initial_state = {
@@ -54,7 +68,7 @@ def start_run(run_id: str, command: str, *, channel: str = "cli") -> dict[str, A
 
 
 def resume_run(run_id: str, user_input: str, *, channel: str = "cli") -> dict[str, Any]:
-    graph = build_graph()
+    graph = _get_graph()
     config = graph_config(run_id)
 
     pending = db.list_pending_reviews()

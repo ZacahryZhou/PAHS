@@ -494,6 +494,10 @@ def dev_batch(
     typer.echo(f"Starting dev batch: {runs} runs (mock={mock}, learner={learner})")
     typer.echo(f"开始批量测试：{runs} 次（mock={mock}, learner={learner}）")
 
+    def on_start(index: int, total: int, scenario: object) -> None:
+        scenario_id = scenario.get("id") if isinstance(scenario, dict) else getattr(scenario, "id", "?")
+        typer.echo(f"Starting [{index}/{total}] {scenario_id}...", err=False)
+
     def on_progress(done: int, total: int, summary: object) -> None:
         status = getattr(summary, "status", "?")
         scenario_id = getattr(summary, "scenario_id", "?")
@@ -505,6 +509,7 @@ def dev_batch(
         with_learner=learner,
         scenario_file=scenario_path,
         on_progress=on_progress,
+        on_start=on_start,
     )
 
     report_path = write_report(result, output_path)

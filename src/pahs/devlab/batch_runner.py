@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from contextlib import contextmanager, nullcontext
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -12,7 +13,8 @@ from typing import Any, Iterator
 import yaml
 
 from pahs.gateway.run_ids import new_run_id
-from pahs.graph.runner import resume_run, start_run
+from pahs.graph.checkpoints import clear_checkpoints
+from pahs.graph.runner import reset_graph_cache, resume_run, start_run
 from pahs.harness.budget import BudgetManager
 from pahs.paths import PROJECT_ROOT
 from pahs.storage import db
@@ -102,15 +104,32 @@ def expand_scenarios(scenarios: list[dict[str, Any]], runs: int) -> list[dict[st
 
 
 @contextmanager
-def force_mock_llm() -> Iterator[None]:
+def dev_batch_mode(*, mock_llm: bool) -> Iterator[None]:
+    import os
+
     import pahs.providers.router as router
 
-    original = router.active_provider_name
-    router.active_provider_name = lambda: "mock"  # type: ignore[method-assign]
+    prior_batch = os.environ.get("PAHS_DEV_BATCH")
+    os.environ["PAHS_DEV_BATCH"] = "1"
+    original_provider = None
+    if mock_llm:
+        original_provider = router.active_provider_name
+        router.active_provider_name = lambda: "mock"  # type: ignore[method-assign]
     try:
         yield
     finally:
-        router.active_provider_name = original  # type: ignore[method-assign]
+        if original_provider is not None:
+            router.active_provider_name = original_provider  # type: ignore[method-assign]
+        if prior_batch is None:
+            os.environ.pop("PAHS_DEV_BATCH", None)
+        else:
+            os.environ["PAHS_DEV_BATCH"] = prior_batch
+
+
+@contextmanager
+def force_mock_llm() -> Iterator[None]:
+    with dev_batch_mode(mock_llm=True):
+        yield
 
 
 def _utc_now() -> str:
@@ -276,6 +295,7 @@ def run_batch(
     with_learner: bool = True,
     scenario_file: Path | None = None,
     on_progress: Any | None = None,
+    on_start: Any | None = None,
 ) -> BatchResult:
     db.init_db()
     scenarios = load_scenarios(scenario_file)
@@ -283,14 +303,22 @@ def run_batch(
     started_at = _utc_now()
     summaries: list[RunSummary] = []
 
-    ctx = force_mock_llm() if mock_llm else nullcontext()
+    clear_checkpoints()
+    reset_graph_cache()
+
+    ctx = dev_batch_mode(mock_llm=mock_llm)
     with ctx:
         BudgetManager.reset_daily()
         for index, scenario in enumerate(plan, start=1):
+            if on_start:
+                on_start(index, runs, scenario)
             summary = run_single_scenario(scenario, with_learner=with_learner)
             summaries.append(summary)
             if on_progress:
                 on_progress(index, runs, summary)
+            if index % 25 == 0:
+                clear_checkpoints()
+                reset_graph_cache()
 
     return BatchResult(
         started_at=started_at,

@@ -27,6 +27,9 @@ def run_pip(spec: ExternalAgentSpec, prompt: str) -> dict[str, Any]:
 
     timeout = int(spec.config.get("timeout_seconds", 3600))
     mock = bool(spec.config.get("mock", False))
+    if os.getenv("PAHS_DEV_BATCH", "").lower() in {"1", "true", "yes"}:
+        mock = True
+        timeout = min(timeout, 60)
     skip_approval = bool(spec.config.get("skip_approval", True))
     stop_after = spec.config.get("stop_after")
 

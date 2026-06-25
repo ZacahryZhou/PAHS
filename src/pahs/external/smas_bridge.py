@@ -103,6 +103,8 @@ def run_smas(spec: ExternalAgentSpec, prompt: str) -> dict[str, Any]:
     cleaned = clean_smas_prompt(prompt)
     subcommand = str(spec.config.get("subcommand", "generate"))
     timeout = int(spec.config.get("timeout_seconds", 900))
+    if os.getenv("PAHS_DEV_BATCH", "").lower() in {"1", "true", "yes"}:
+        timeout = min(timeout, 60)
 
     if subcommand == "generate" and bool(spec.config.get("auto_clear_pending", True)):
         _clear_smas_pending(spec, project_dir, bridge, timeout)
@@ -124,6 +126,8 @@ def run_smas_action(spec: ExternalAgentSpec, action_text: str) -> dict[str, Any]
     project_dir = Path(os.path.expanduser(str(spec.config.get("project_dir", "~/Desktop/SMAS"))))
     bridge = project_dir / "scripts" / "smas.sh"
     timeout = int(spec.config.get("timeout_seconds", 900))
+    if os.getenv("PAHS_DEV_BATCH", "").lower() in {"1", "true", "yes"}:
+        timeout = min(timeout, 60)
     cmd = [str(bridge), "message", action_text]
 
     result = _run_smas_subprocess(project_dir, bridge, cmd, timeout=timeout)

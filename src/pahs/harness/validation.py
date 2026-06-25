@@ -43,6 +43,17 @@ def _needs_stage2(score: float) -> bool:
 def verify_pipeline_node(state: PAHSState) -> dict:
     output = state.get("milestone_output", "")
     command = state.get("user_command", "")
+    worker = state.get("worker", state.get("active_agent", "creator"))
+
+    if worker == "searcher":
+        sources = state.get("sources", [])
+        if not sources and "http" not in output:
+            return {
+                "validation_passed": False,
+                "validation_message": "Searcher output must include sources.",
+                "validation_score": 0.0,
+                "validation_stage": "stage_1",
+            }
 
     ok, message, score = _stage1_rules(output)
     if not ok:

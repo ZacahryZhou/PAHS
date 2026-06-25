@@ -31,9 +31,13 @@ def orchestrator_plan_node(state: PAHSState) -> dict:
         current_milestone_id=milestone["id"],
         plan_json=plan,
     )
+    worker = plan.get("worker", "creator")
+    execution_mode = plan.get("execution_mode")
     return {
         "plan": plan,
         "milestone_id": milestone["id"],
+        "worker": worker,
+        "execution_mode": execution_mode,
         "status": "PLANNED",
     }
 

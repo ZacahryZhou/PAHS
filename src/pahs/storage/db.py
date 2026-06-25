@@ -197,3 +197,57 @@ def list_run_events(run_id: str) -> list[dict[str, Any]]:
             item["payload"] = json.loads(item["payload_json"])
         results.append(item)
     return results
+
+
+def register_user_channel(user_id: str, channel: str, channel_user_id: str) -> None:
+    with connect() as conn:
+        conn.execute(
+            """
+            INSERT OR REPLACE INTO user_channels (user_id, channel, channel_user_id)
+            VALUES (?, ?, ?)
+            """,
+            (user_id, channel, channel_user_id),
+        )
+        conn.commit()
+
+
+def resolve_user_id(channel: str, channel_user_id: str, *, default: str = "default") -> str:
+    with connect() as conn:
+        row = conn.execute(
+            """
+            SELECT user_id FROM user_channels
+            WHERE channel = ? AND channel_user_id = ?
+            """,
+            (channel, channel_user_id),
+        ).fetchone()
+    if row is None:
+        register_user_channel(default, channel, channel_user_id)
+        return default
+    return str(row["user_id"])
+
+
+def summarize_test_data() -> dict[str, int]:
+    with connect() as conn:
+        runs = conn.execute("SELECT COUNT(*) AS c FROM runs").fetchone()["c"]
+        pending = conn.execute(
+            "SELECT COUNT(*) AS c FROM review_queue WHERE status = 'pending'"
+        ).fetchone()["c"]
+        reviews = conn.execute("SELECT COUNT(*) AS c FROM review_queue").fetchone()["c"]
+        events = conn.execute("SELECT COUNT(*) AS c FROM run_events").fetchone()["c"]
+    return {
+        "runs": int(runs),
+        "pending_reviews": int(pending),
+        "review_rows": int(reviews),
+        "events": int(events),
+    }
+
+
+def clear_all_run_data() -> dict[str, int]:
+    """Delete all runs, reviews, and events. Keeps user_channels."""
+    summary = summarize_test_data()
+    with connect() as conn:
+        conn.execute("DELETE FROM run_events")
+        conn.execute("DELETE FROM review_queue")
+        conn.execute("DELETE FROM runs")
+        conn.commit()
+    return summary

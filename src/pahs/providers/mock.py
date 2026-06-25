@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pahs.routing.worker_router import choose_worker
 
 def mock_triage(command: str) -> dict:
     lowered = command.lower()
@@ -38,9 +39,12 @@ def mock_triage(command: str) -> dict:
 
 def mock_plan(command: str, profile: str, triage: dict) -> dict:
     milestone_title = "Final draft" if profile == "lite" else "Draft output"
+    worker, execution_mode = choose_worker(command, triage)
     return {
         "intent": command,
         "orchestrator_profile": profile,
+        "worker": worker,
+        "execution_mode": execution_mode,
         "milestones": [
             {
                 "id": "m1_output",

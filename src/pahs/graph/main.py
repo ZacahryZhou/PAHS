@@ -1,4 +1,4 @@
-"""Build and run the PAHS LangGraph with Week 2 Harness layers."""
+"""Build and run the PAHS LangGraph with Week 2/3 Harness layers."""
 
 from __future__ import annotations
 
@@ -7,6 +7,8 @@ from typing import Any, Literal
 from langgraph.graph import END, StateGraph
 from langgraph.types import Command, interrupt
 
+from pahs.agents.executor import executor_node
+from pahs.agents.searcher import searcher_node
 from pahs.agents.week1 import creator_node, orchestrator_plan_node, triage_node
 from pahs.config_loader import budget_config
 from pahs.graph.checkpoints import get_checkpointer
@@ -39,26 +41,37 @@ def load_global_rules_node(state: PAHSState) -> dict:
 
 
 def load_target_rules_node(state: PAHSState) -> dict:
-    pack = _rule_engine.load_for_agent("creator")
-    tools = [tool.name for tool in list_tools_for_agent("creator")]
-    loaded = list(state.get("loaded_rules", [])) + pack.paths
+    worker = state.get("worker", "creator")
+    execution_mode = state.get("execution_mode")
+    loaded = list(state.get("loaded_rules", []))
+
+    if worker == "executor" and execution_mode:
+        pack = _rule_engine.load_for_mode(execution_mode)
+        scope = f"mode:{execution_mode}"
+    else:
+        pack = _rule_engine.load_for_agent(worker)
+        scope = worker
+
+    tools = [tool.name for tool in list_tools_for_agent(worker)]
+    loaded.extend(pack.paths)
     db.log_event(
         state["run_id"],
         "rules_loaded",
-        {"scope": "creator", "paths": pack.paths, "tools": tools},
+        {"scope": scope, "paths": pack.paths, "tools": tools, "worker": worker},
     )
     return {
         "loaded_rules": loaded,
-        "active_agent": "creator",
+        "active_agent": worker,
         "tools_available": tools,
         "status": "TARGET_RULES_LOADED",
     }
 
 
 def env_precheck_node(state: PAHSState) -> dict:
+    worker = state.get("worker", "creator")
     budget = BudgetManager(state["run_id"])
     monitor = EnvironmentMonitor(budget)
-    result = monitor.precheck(state, step_name="creator_execute")
+    result = monitor.precheck(state, step_name=f"{worker}_execute")
     db.log_event(state["run_id"], "environment_precheck", result.get("harness_event"))
     return {
         "env_check_passed": result["env_check_passed"],
@@ -66,6 +79,15 @@ def env_precheck_node(state: PAHSState) -> dict:
         "budget_snapshot": result["budget_snapshot"],
         "status": "ENV_OK" if result["env_check_passed"] else "BLOCKED_BY_ENV",
     }
+
+
+def worker_execute_node(state: PAHSState) -> dict:
+    worker = state.get("worker", "creator")
+    if worker == "searcher":
+        return searcher_node(state)
+    if worker == "executor":
+        return executor_node(state)
+    return creator_node(state)
 
 
 def handle_verify_retry_node(state: PAHSState) -> dict:
@@ -97,6 +119,8 @@ def present_milestone_node(state: PAHSState) -> dict:
     presentation = (
         "## Milestone Review | 阶段审核\n\n"
         f"Run: `{state['run_id']}`\n"
+        f"Worker: `{state.get('worker', 'creator')}`\n"
+        f"Mode: `{state.get('execution_mode') or 'none'}`\n"
         f"Milestone: `{state.get('milestone_id', 'm1_output')}`\n"
         f"Complexity: `{state.get('complexity_band', 'unknown')}`\n\n"
         f"{state.get('milestone_output', '')}\n\n"
@@ -125,6 +149,7 @@ def final_present_node(state: PAHSState) -> dict:
     policy = state.get("review_policy", {})
     final_response = (
         "## Final Delivery | 最终交付\n\n"
+        f"Worker: `{state.get('worker', 'creator')}`\n"
         f"Review policy: `{policy.get('milestone_reviews', 'unknown')}`\n\n"
         f"{state.get('milestone_output', '')}\n\n"
         "Please send final feedback after the run completes.\n"
@@ -170,12 +195,12 @@ def route_after_verify(
     return "failed"
 
 
-def route_after_milestone_review(state: PAHSState) -> Literal["final_present", "creator"]:
+def route_after_milestone_review(state: PAHSState) -> Literal["final_present", "retry_worker"]:
     text = state.get("user_milestone_review", "").strip().lower()
     approved = text in {"approved", "approve", "ok", "pass", "通过", "好", "可以", "yes"}
     if approved:
         return "final_present"
-    return "creator"
+    return "retry_worker"
 
 
 def build_graph():
@@ -187,7 +212,7 @@ def build_graph():
     graph.add_node("orchestrator_plan", orchestrator_plan_node)
     graph.add_node("env_precheck", env_precheck_node)
     graph.add_node("load_target_rules", load_target_rules_node)
-    graph.add_node("creator_execute", creator_node)
+    graph.add_node("worker_execute", worker_execute_node)
     graph.add_node("verify_pipeline", verify_pipeline_node)
     graph.add_node("handle_verify_retry", handle_verify_retry_node)
     graph.add_node("failed_end", failed_end_node)
@@ -207,8 +232,8 @@ def build_graph():
         route_after_env,
         {"continue": "load_target_rules", "blocked": "blocked_end"},
     )
-    graph.add_edge("load_target_rules", "creator_execute")
-    graph.add_edge("creator_execute", "verify_pipeline")
+    graph.add_edge("load_target_rules", "worker_execute")
+    graph.add_edge("worker_execute", "verify_pipeline")
     graph.add_conditional_edges(
         "verify_pipeline",
         route_after_verify,
@@ -219,12 +244,12 @@ def build_graph():
             "failed": "failed_end",
         },
     )
-    graph.add_edge("handle_verify_retry", "creator_execute")
+    graph.add_edge("handle_verify_retry", "worker_execute")
     graph.add_edge("present_milestone", "milestone_human_review")
     graph.add_conditional_edges(
         "milestone_human_review",
         route_after_milestone_review,
-        {"final_present": "final_present", "creator": "load_target_rules"},
+        {"final_present": "final_present", "retry_worker": "load_target_rules"},
     )
     graph.add_edge("final_present", "final_feedback_request")
     graph.add_edge("final_feedback_request", END)

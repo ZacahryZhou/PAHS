@@ -32,10 +32,22 @@ APPROVED_TOOLS: dict[str, ToolDescriptor] = {
     ),
     "run_python": ToolDescriptor(
         name="run_python",
-        agent="code",
+        agent="executor",
         description="Execute Python in a sandbox.",
         cost_per_call=0.0,
         sandbox=True,
+    ),
+    "read_file": ToolDescriptor(
+        name="read_file",
+        agent="executor",
+        description="Read a file from the PAHS data directory.",
+        cost_per_call=0.0,
+    ),
+    "write_file": ToolDescriptor(
+        name="write_file",
+        agent="executor",
+        description="Write a file into the PAHS data directory.",
+        cost_per_call=0.0,
     ),
 }
 

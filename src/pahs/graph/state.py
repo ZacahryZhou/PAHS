@@ -18,6 +18,9 @@ class PAHSState(TypedDict, total=False):
     milestone_output: str
     loaded_rules: list[str]
     active_agent: str
+    worker: str
+    execution_mode: str | None
+    sources: list[dict[str, Any]]
     tools_available: list[str]
     budget_snapshot: dict[str, Any]
     env_check_passed: bool

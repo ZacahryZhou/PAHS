@@ -6,15 +6,24 @@
   <title>PAHS Dev Lab</title>
   <style>
     :root {
-      --bg: #fff;
-      --border: #ccc;
-      --text: #000;
-      --muted: #666;
+      --bg: #f7f7f8;
+      --surface: #ffffff;
+      --border: #e4e4e7;
+      --text: #18181b;
+      --muted: #71717a;
+      --accent: #18181b;
+      --accent-soft: #f4f4f5;
+      --done: #18181b;
+      --active-ring: #3b82f6;
+      --fail: #dc2626;
+      --ok: #16a34a;
+      --radius: 10px;
+      --shadow: 0 1px 3px rgba(0,0,0,.06), 0 4px 12px rgba(0,0,0,.04);
     }
     * { box-sizing: border-box; }
     body {
       margin: 0;
-      font-family: system-ui, sans-serif;
+      font-family: "Inter", "SF Pro Text", system-ui, -apple-system, sans-serif;
       background: var(--bg);
       color: var(--text);
       height: 100vh;
@@ -22,347 +31,343 @@
       flex-direction: column;
     }
     header {
-      padding: 10px 16px;
+      padding: 12px 20px;
+      background: var(--surface);
       border-bottom: 1px solid var(--border);
       display: flex;
       justify-content: space-between;
       align-items: center;
-      font-size: 0.9rem;
+      box-shadow: var(--shadow);
+      z-index: 10;
     }
-    header h1 { margin: 0; font-size: 1rem; font-weight: 600; }
-    header .meta { font-family: monospace; font-size: 0.75rem; color: var(--muted); }
-    main {
-      flex: 1;
-      display: grid;
-      grid-template-columns: 160px 1.35fr 0.9fr;
-      min-height: 0;
-    }
-    .history-panel {
-      display: flex;
-      flex-direction: column;
-      border-right: 1px solid var(--border);
-      min-height: 0;
-      background: #fafafa;
-    }
-    #history-list {
-      flex: 1;
-      overflow-y: auto;
-      font-size: 0.72rem;
-    }
-    .history-item {
-      padding: 8px 10px;
-      border-bottom: 1px solid var(--border);
-      cursor: pointer;
-    }
-    .history-item:hover { background: #f0f0f0; }
-    .history-item.active { background: #000; color: #fff; }
-    .history-item .cmd { font-weight: 600; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .history-item .meta { font-family: monospace; font-size: 0.65rem; opacity: 0.8; }
-    .history-item.FAILED .cmd { color: inherit; }
-    #plan-panel {
-      display: none;
-      border-top: 1px solid var(--border);
-      background: #fff;
-      min-height: 140px;
-      max-height: 28vh;
-      overflow: hidden;
-      flex-direction: column;
-      flex-shrink: 0;
-    }
-    #plan-panel.visible { display: flex; }
-    #plan-panel header {
-      padding: 6px 10px;
-      border-bottom: 1px solid var(--border);
-      font-size: 0.7rem;
+    header h1 { margin: 0; font-size: 1.05rem; font-weight: 650; letter-spacing: -0.02em; }
+    .header-meta { display: flex; align-items: center; gap: 10px; font-size: 0.78rem; }
+    .run-id { font-family: ui-monospace, monospace; color: var(--muted); max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .status-pill {
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: var(--text);
       font-weight: 600;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      background: #f5f5f5;
-    }
-    #plan-body {
-      padding: 10px;
-      overflow-y: auto;
-      font-family: ui-monospace, monospace;
       font-size: 0.72rem;
-      white-space: pre-wrap;
-      line-height: 1.5;
-      flex: 1;
     }
-    .status-ok { color: #060; font-weight: 600; }
+    .status-pill.ok { background: #dcfce7; color: var(--ok); }
+    .status-pill.err { background: #fee2e2; color: var(--fail); }
+    .status-pill.run { background: #dbeafe; color: #1d4ed8; }
+
+    .workspace {
+      flex: 1;
+      display: flex;
+      min-height: 0;
+      overflow: hidden;
+    }
     .chat-panel {
+      flex: 0 0 48%;
+      min-width: 300px;
       display: flex;
       flex-direction: column;
-      border-right: 1px solid var(--border);
+      background: var(--surface);
       min-height: 0;
+    }
+    .resizer {
+      width: 5px;
+      cursor: col-resize;
+      background: var(--border);
+      flex-shrink: 0;
+      transition: background .15s;
+      position: relative;
+    }
+    .resizer:hover, .resizer.dragging { background: #a1a1aa; }
+    .resizer::after {
+      content: "";
+      position: absolute;
+      inset: 0 -4px;
     }
     .graph-panel {
+      flex: 1;
+      min-width: 340px;
       display: flex;
       flex-direction: column;
       min-height: 0;
-      background: #fafafa;
+      background: var(--bg);
     }
-    .panel-title {
-      padding: 8px 12px;
-      font-size: 0.65rem;
+    .panel-head {
+      padding: 10px 16px;
+      font-size: 0.7rem;
+      font-weight: 650;
+      letter-spacing: 0.06em;
       text-transform: uppercase;
-      letter-spacing: 0.1em;
       color: var(--muted);
       border-bottom: 1px solid var(--border);
-      font-weight: 600;
+      background: var(--surface);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
     }
+    .panel-head span.hint { font-weight: 500; text-transform: none; letter-spacing: 0; font-size: 0.72rem; }
+
+    #error-banner {
+      display: none;
+      margin: 10px 14px 0;
+      padding: 10px 12px;
+      border-radius: var(--radius);
+      border: 1px solid #fecaca;
+      background: #fef2f2;
+      color: var(--fail);
+      font-size: 0.8rem;
+      white-space: pre-wrap;
+    }
+    #error-banner.visible { display: block; }
+
     #messages {
       flex: 1;
       min-height: 0;
       overflow-y: auto;
-      padding: 12px;
+      padding: 16px;
       display: flex;
       flex-direction: column;
       gap: 10px;
     }
     .msg {
-      max-width: 95%;
-      padding: 10px 14px;
+      max-width: 92%;
+      padding: 11px 14px;
       font-size: 0.9rem;
       line-height: 1.55;
       white-space: pre-wrap;
-      border-radius: 4px;
+      border-radius: 12px;
     }
-    .msg.user { align-self: flex-end; background: #000; color: #fff; }
-    .msg.assistant { align-self: flex-start; border: 1px solid var(--border); }
-    .msg.system { align-self: center; color: var(--muted); font-size: 0.75rem; }
+    .msg.user { align-self: flex-end; background: var(--accent); color: #fff; border-bottom-right-radius: 4px; }
+    .msg.assistant { align-self: flex-start; background: var(--accent-soft); border: 1px solid var(--border); border-bottom-left-radius: 4px; }
+    .msg.system { align-self: center; color: var(--muted); font-size: 0.78rem; background: transparent; padding: 4px; }
+    .msg.error { align-self: stretch; border: 1px solid #fecaca; color: var(--fail); background: #fef2f2; }
+
     .composer {
-      padding: 10px 12px;
+      padding: 12px 14px;
       border-top: 1px solid var(--border);
       display: flex;
       gap: 8px;
+      background: var(--surface);
     }
     textarea {
       flex: 1;
-      min-height: 40px;
+      min-height: 44px;
+      max-height: 120px;
       border: 1px solid var(--border);
-      border-radius: 3px;
-      padding: 8px;
+      border-radius: var(--radius);
+      padding: 10px 12px;
       font: inherit;
       resize: vertical;
+      background: var(--bg);
+      transition: border-color .15s, box-shadow .15s;
     }
+    textarea:focus { outline: none; border-color: #a1a1aa; box-shadow: 0 0 0 3px rgba(24,24,27,.06); }
     button {
-      background: #000;
+      background: var(--accent);
       color: #fff;
       border: none;
-      padding: 8px 14px;
-      border-radius: 3px;
+      padding: 10px 16px;
+      border-radius: var(--radius);
       cursor: pointer;
       font: inherit;
+      font-weight: 600;
+      font-size: 0.85rem;
+      transition: opacity .15s;
     }
-    button:disabled { opacity: 0.35; }
-    button.secondary { background: #fff; color: #000; border: 1px solid #000; }
-    #graph-wrap {
-      flex: 1;
-      min-height: 0;
-      overflow: auto;
-      padding: 8px;
-    }
-    #arch-svg {
-      width: 100%;
-      min-width: 400px;
-      height: auto;
-      display: block;
-    }
-    .path-legend {
-      display: flex;
-      gap: 16px;
-      padding: 6px 12px;
-      font-size: 0.7rem;
-      color: var(--muted);
-      border-bottom: 1px solid var(--border);
-    }
-    .path-legend span.active { color: #000; font-weight: 600; }
-    #timeline {
-      max-height: 72px;
-      flex-shrink: 0;
-      overflow-y: auto;
-      padding: 6px 12px;
-      font-size: 0.65rem;
-      font-family: monospace;
-      color: var(--muted);
-      border-top: 1px solid var(--border);
-      background: #fff;
-    }
+    button:hover { opacity: .88; }
+    button:disabled { opacity: .35; cursor: not-allowed; }
+    button.secondary { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
+
     .review-box {
       display: none;
       flex-direction: column;
       flex: 1;
       min-height: 0;
       border-top: 1px solid var(--border);
-      background: #fafafa;
     }
     .review-box.visible { display: flex; }
     .review-preview {
       flex: 1;
-      min-height: 180px;
-      border: none;
-      border-bottom: 1px dashed var(--border);
-      padding: 12px;
-      font-size: 0.88rem;
-      line-height: 1.55;
+      min-height: 160px;
+      padding: 16px;
+      font-size: 0.9rem;
+      line-height: 1.6;
       overflow-y: auto;
       white-space: pre-wrap;
-      margin: 0;
-      background: #fff;
-    }
-    .review-box .composer {
-      flex-shrink: 0;
       background: #fafafa;
     }
-    /* SVG node styles via classes */
-    .g-node rect { stroke: #999; stroke-width: 1; fill: #fff; transition: all 0.2s; }
-    .g-node.idle rect { fill: #f5f5f5; stroke: #ddd; opacity: 0.55; }
-    .g-node.pending rect { fill: #fff; stroke: #bbb; }
-    .g-node.active rect { fill: #fff; stroke: #000; stroke-width: 2.5; }
-    .g-node.done rect { fill: #000; stroke: #000; }
-    .g-node.done text { fill: #fff !important; }
-    .g-node.done .sub { fill: #ccc !important; }
-    .g-node.waiting rect { fill: #fff; stroke: #000; stroke-dasharray: 4 2; }
-    .g-node.failed rect { fill: #fff; stroke: #c00; stroke-width: 2.5; }
-    .g-node { cursor: pointer; }
-    .g-edge { stroke: #bbb; stroke-width: 1; fill: none; }
-    .g-edge.path-b { stroke: #ddd; stroke-dasharray: 5 3; }
-    .g-edge.active { stroke: #000; stroke-width: 1.5; }
-    .msg.error { align-self: stretch; border: 1px solid #c00; color: #900; background: #fff5f5; font-size: 0.8rem; }
-    #error-banner {
-      display: none;
-      margin: 0 12px 8px;
-      padding: 8px 10px;
-      border: 1px solid #c00;
-      background: #fff5f5;
-      color: #900;
-      font-size: 0.75rem;
-      white-space: pre-wrap;
-      max-height: 120px;
-      overflow-y: auto;
+    .chat-panel.review-mode #messages { flex: 0 0 64px; max-height: 64px; overflow: hidden; opacity: .7; }
+    .chat-panel.review-mode .review-box { flex: 1; }
+
+    .path-legend {
+      display: flex;
+      gap: 12px;
+      padding: 8px 16px;
+      font-size: 0.72rem;
+      color: var(--muted);
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
     }
-    #error-banner.visible { display: block; }
-    .modal-backdrop {
-      display: none;
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,0.35);
-      z-index: 100;
-      align-items: center;
-      justify-content: center;
-      padding: 16px;
+    .path-legend .on { color: var(--text); font-weight: 650; }
+
+    #graph-wrap {
+      flex: 1;
+      min-height: 180px;
+      overflow: auto;
+      padding: 12px;
+      background: linear-gradient(180deg, #fafafa 0%, var(--bg) 100%);
     }
-    .modal-backdrop.open { display: flex; }
-    .modal {
-      background: #fff;
-      border: 1px solid #000;
-      max-width: 640px;
-      width: 100%;
-      max-height: 80vh;
+    #arch-svg { width: 100%; min-width: 380px; height: auto; display: block; }
+
+    #node-detail {
+      flex: 0 0 38%;
+      min-height: 160px;
+      max-height: 45%;
       display: flex;
       flex-direction: column;
+      border-top: 1px solid var(--border);
+      background: var(--surface);
+      box-shadow: 0 -4px 16px rgba(0,0,0,.04);
     }
-    .modal header {
+    #node-detail.empty .detail-body { color: var(--muted); }
+    .detail-head {
       padding: 10px 14px;
       border-bottom: 1px solid var(--border);
       display: flex;
       justify-content: space-between;
       align-items: center;
+      gap: 8px;
     }
-    .modal header h2 { margin: 0; font-size: 0.95rem; }
-    .modal-close { background: none; border: none; color: #000; font-size: 1.2rem; padding: 0 4px; }
-    .modal-body {
-      padding: 12px 14px;
+    .detail-head h3 { margin: 0; font-size: 0.88rem; font-weight: 650; }
+    .detail-head .badge {
+      font-size: 0.68rem;
+      padding: 3px 8px;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: var(--muted);
+      font-weight: 600;
+    }
+    .detail-body {
+      flex: 1;
       overflow-y: auto;
-      font-size: 0.8rem;
+      padding: 12px 14px;
+      font-size: 0.82rem;
+      line-height: 1.5;
     }
-    .event-card {
+
+    .task-card {
       border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 12px;
       margin-bottom: 8px;
-      padding: 8px;
+      background: var(--bg);
     }
-    .event-card .meta { font-family: monospace; font-size: 0.7rem; color: var(--muted); margin-bottom: 4px; }
-    .event-card pre {
-      margin: 4px 0 0;
-      padding: 6px;
-      background: #f5f5f5;
+    .task-card .row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 4px; }
+    .task-card .tag {
+      font-size: 0.68rem;
+      font-weight: 650;
+      padding: 2px 7px;
+      border-radius: 4px;
+      background: var(--accent);
+      color: #fff;
+    }
+    .task-card .tag.tool { background: #e4e4e7; color: var(--text); }
+    .task-card .goal { color: var(--text); margin-top: 4px; }
+
+    .event-row {
+      border-left: 3px solid var(--border);
+      padding: 6px 0 6px 10px;
+      margin-bottom: 10px;
+    }
+    .event-row .time { font-family: ui-monospace, monospace; font-size: 0.68rem; color: var(--muted); }
+    .event-row .sum { margin: 2px 0; font-weight: 500; }
+    .event-row pre {
+      margin: 6px 0 0;
+      padding: 8px;
+      background: var(--bg);
+      border-radius: 6px;
       font-size: 0.68rem;
       overflow-x: auto;
       white-space: pre-wrap;
       word-break: break-word;
+      max-height: 120px;
+      overflow-y: auto;
     }
-    .timeline-row { cursor: pointer; padding: 1px 0; }
-    .timeline-row:hover { color: #000; text-decoration: underline; }
-    .timeline-row.err { color: #c00; }
-    .chat-panel.review-mode #messages {
-      flex: 0 0 72px;
-      max-height: 72px;
-      opacity: 0.85;
-    }
-    .chat-panel.review-mode .review-box { flex: 1; }
+    .event-row.err { border-left-color: var(--fail); }
+
+    /* SVG nodes */
+    .g-node rect { stroke: #d4d4d8; stroke-width: 1.5; fill: #fff; transition: all .18s ease; }
+    .g-node.idle rect { fill: #f4f4f5; stroke: #e4e4e7; opacity: .5; }
+    .g-node.pending rect { fill: #fff; }
+    .g-node.active rect { fill: #fff; stroke: var(--active-ring); stroke-width: 2.5; filter: drop-shadow(0 0 4px rgba(59,130,246,.35)); }
+    .g-node.done rect { fill: var(--done); stroke: var(--done); }
+    .g-node.done text { fill: #fff !important; }
+    .g-node.done .sub { fill: #d4d4d8 !important; }
+    .g-node.waiting rect { fill: #fff; stroke: var(--accent); stroke-dasharray: 5 3; }
+    .g-node.failed rect { fill: #fef2f2; stroke: var(--fail); stroke-width: 2.5; }
+    .g-node.selected rect { stroke: var(--active-ring); stroke-width: 3; }
+    .g-node { cursor: pointer; }
+    .g-node:hover rect { stroke: #71717a; }
+    .g-edge { stroke: #d4d4d8; stroke-width: 1.2; fill: none; }
+    .g-edge.path-b { stroke: #e4e4e7; stroke-dasharray: 5 3; }
+    .g-edge.active { stroke: var(--accent); stroke-width: 1.8; }
   </style>
 </head>
 <body>
   <header>
     <h1>PAHS Dev Lab</h1>
-    <div class="meta"><span id="run-label">idle</span> · <span id="status-label">ready</span></div>
+    <div class="header-meta">
+      <span class="run-id" id="run-label">idle</span>
+      <span class="status-pill" id="status-label">ready</span>
+    </div>
   </header>
-  <main>
-    <section class="history-panel">
-      <div class="panel-title">运行历史</div>
-      <div id="history-list">加载中…</div>
-    </section>
-    <section class="chat-panel">
-      <div class="panel-title">Chat · 消息与审核</div>
+
+  <div class="workspace" id="workspace">
+    <section class="chat-panel" id="chat-panel">
+      <div class="panel-head">对话</div>
       <div id="error-banner"></div>
       <div id="messages"></div>
       <div class="review-box" id="review-box">
-        <div class="panel-title" style="border-top:none">里程碑产出 · 回复「通过」继续</div>
+        <div class="panel-head" style="border-top:1px solid var(--border)">里程碑产出</div>
         <div class="review-preview" id="review-preview"></div>
         <div class="composer">
-          <textarea id="review-input" placeholder="修改意见"></textarea>
+          <textarea id="review-input" placeholder="修改意见，或直接点通过"></textarea>
           <button type="button" class="secondary" id="approve-btn">通过</button>
           <button type="button" class="secondary" id="reply-btn">提交</button>
         </div>
       </div>
       <div class="composer" id="main-composer">
-        <textarea id="input" placeholder="测试命令；输入「架构」查看说明"></textarea>
+        <textarea id="input" placeholder="输入测试命令，例如：帮我搜索咖啡热点"></textarea>
         <button type="button" id="send-btn">发送</button>
       </div>
     </section>
-    <section class="graph-panel">
-      <div class="panel-title">Global Architecture</div>
+
+    <div class="resizer" id="resizer" title="拖动调整宽度"></div>
+
+    <section class="graph-panel" id="graph-panel">
+      <div class="panel-head">
+        架构流程
+        <span class="hint">点击节点查看任务详情</span>
+      </div>
       <div class="path-legend">
-        <span id="leg-a" class="active">Path A — LangGraph 完整团队</span>
-        <span id="leg-b">Path B — Telegram 直达 SMAS/PIP</span>
+        <span class="on">Path A · LangGraph</span>
+        <span>Path B · Telegram 直达</span>
       </div>
       <div id="graph-wrap">
         <svg id="arch-svg" viewBox="0 0 820 720" xmlns="http://www.w3.org/2000/svg"></svg>
       </div>
-      <div id="plan-panel">
-        <header>
-          <span>任务表 ExecutionPlan</span>
-          <button type="button" class="secondary" id="plan-expand" style="padding:2px 8px;font-size:0.65rem">全屏</button>
-        </header>
-        <div id="plan-body">Orchestrator 产出计划后显示在此；也可点击图中 Orchestrator 节点查看。</div>
+      <div id="node-detail" class="empty">
+        <div class="detail-head">
+          <h3 id="detail-title">节点详情</h3>
+          <span class="badge" id="detail-badge">—</span>
+        </div>
+        <div class="detail-body" id="detail-body">点击架构图中的任意节点，查看该步骤的任务与事件日志。</div>
       </div>
-      <div id="timeline">事件时间线 · 点击节点或事件查看详情</div>
     </section>
-  </main>
-  <div class="modal-backdrop" id="modal">
-    <div class="modal">
-      <header>
-        <h2 id="modal-title">节点详情</h2>
-        <button type="button" class="modal-close" id="modal-close">×</button>
-      </header>
-      <div class="modal-body" id="modal-body"></div>
-    </div>
   </div>
+
   <script>
     const svg = document.getElementById("arch-svg");
     const messagesEl = document.getElementById("messages");
-    const timelineEl = document.getElementById("timeline");
     const inputEl = document.getElementById("input");
     const sendBtn = document.getElementById("send-btn");
     const runLabel = document.getElementById("run-label");
@@ -372,19 +377,43 @@
     const reviewInput = document.getElementById("review-input");
     const mainComposer = document.getElementById("main-composer");
     const errorBanner = document.getElementById("error-banner");
-    const modal = document.getElementById("modal");
-    const modalTitle = document.getElementById("modal-title");
-    const modalBody = document.getElementById("modal-body");
-    const historyList = document.getElementById("history-list");
-    const planPanel = document.getElementById("plan-panel");
-    const planBody = document.getElementById("plan-body");
+    const chatPanel = document.getElementById("chat-panel");
+    const detailPanel = document.getElementById("node-detail");
+    const detailTitle = document.getElementById("detail-title");
+    const detailBadge = document.getElementById("detail-badge");
+    const detailBody = document.getElementById("detail-body");
+    const resizer = document.getElementById("resizer");
 
     let currentRunId = null;
     let eventSource = null;
     let pollTimer = null;
-    let graphMeta = { nodes: [], edges: [] };
     let lastProgress = null;
     let lastShownError = "";
+    let selectedNodeId = null;
+
+    /* —— resizable split —— */
+    let dragging = false;
+    resizer.addEventListener("mousedown", (e) => {
+      dragging = true;
+      resizer.classList.add("dragging");
+      document.body.style.cursor = "col-resize";
+      document.body.style.userSelect = "none";
+      e.preventDefault();
+    });
+    document.addEventListener("mousemove", (e) => {
+      if (!dragging) return;
+      const ws = document.getElementById("workspace");
+      const rect = ws.getBoundingClientRect();
+      const pct = ((e.clientX - rect.left) / rect.width) * 100;
+      chatPanel.style.flex = `0 0 ${Math.min(72, Math.max(28, pct))}%`;
+    });
+    document.addEventListener("mouseup", () => {
+      if (!dragging) return;
+      dragging = false;
+      resizer.classList.remove("dragging");
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    });
 
     function isArchQuery(t) {
       return /^(目前)?架构$|^architecture$|^流程$/i.test(t.trim());
@@ -398,6 +427,20 @@
       messagesEl.scrollTop = messagesEl.scrollHeight;
     }
 
+    function setStatus(status) {
+      const map = {
+        AWAITING_REVIEW: ["等待审核", "ok"],
+        AWAITING_FINAL_FEEDBACK: ["等待反馈", "ok"],
+        COMPLETED: ["已完成", "ok"],
+        FAILED: ["失败", "err"],
+        ACTIVE: ["运行中", "run"],
+        STARTING: ["启动中", "run"],
+      };
+      const [text, cls] = map[status] || [status || "ready", ""];
+      statusLabel.textContent = text;
+      statusLabel.className = "status-pill" + (cls ? " " + cls : "");
+    }
+
     function showRunError(err) {
       if (!err) {
         errorBanner.classList.remove("visible");
@@ -405,259 +448,184 @@
         return;
       }
       errorBanner.classList.add("visible");
-      errorBanner.textContent = "运行失败：\n" + err;
+      errorBanner.textContent = err;
       if (err !== lastShownError) {
         lastShownError = err;
-        addMessage("error", "❌ " + err);
+        addMessage("error", err);
       }
     }
 
-    function statusLabelText(status) {
-      const map = {
-        AWAITING_REVIEW: "等待审核 ✓",
-        AWAITING_FINAL_FEEDBACK: "等待最终反馈",
-        COMPLETED: "已完成 ✓",
-        FAILED: "失败",
-        ACTIVE: "运行中",
-        STARTING: "启动中",
-      };
-      return map[status] || status || "ready";
+    function escapeHtml(s) {
+      return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
     }
 
-    function openNodeModal(nodeId) {
+    function formatPlanCards(plan) {
+      if (!plan || !plan.phases) return "";
+      let html = `<p style="margin:0 0 8px;color:var(--muted)">${escapeHtml(plan.intent_summary || "")}</p>`;
+      html += `<p style="margin:0 0 10px;font-size:0.72rem">复杂度 ${escapeHtml(plan.complexity_band)} · ${escapeHtml(plan.orchestrator_profile)} · 来源 ${escapeHtml(plan.source || "?")}</p>`;
+      (plan.phases || []).forEach((ph) => {
+        html += `<div style="font-weight:650;margin:8px 0 4px">${escapeHtml(ph.title || ph.id)}${ph.parallel ? " ⚡并行" : ""}</div>`;
+        (ph.tasks || []).forEach((t) => {
+          html += `<div class="task-card">
+            <div class="row"><span class="tag">${escapeHtml(t.worker)}</span><span class="tag tool">${escapeHtml(t.tool || "—")}</span><span style="font-size:0.68rem;color:var(--muted)">${escapeHtml(t.id)}</span></div>
+            <div class="goal">${escapeHtml(t.goal)}</div>
+          </div>`;
+        });
+      });
+      return html;
+    }
+
+    function tasksForWorker(plan, worker) {
+      if (!plan) return [];
+      const out = [];
+      (plan.phases || []).forEach((ph) => {
+        (ph.tasks || []).forEach((t) => {
+          if (t.worker === worker) out.push({ phase: ph, task: t });
+        });
+      });
+      return out;
+    }
+
+    function renderNodeDetail(nodeId) {
+      selectedNodeId = nodeId;
       if (!lastProgress) return;
+
       const node = (lastProgress.nodes || []).find((n) => n.id === nodeId);
       const events = (lastProgress.node_details || {})[nodeId] || [];
-      modalTitle.textContent = node
-        ? `${node.label} (${node.sublabel || node.id})`
-        : nodeId;
+      const plan = lastProgress.snapshot && lastProgress.snapshot.execution_plan;
+      const st = node ? node.status : "pending";
+
+      detailPanel.classList.remove("empty");
+      detailTitle.textContent = node ? node.label : nodeId;
+      detailBadge.textContent = (node && node.sublabel) ? node.sublabel : st;
 
       let html = "";
-      if (nodeId === "orchestrator_plan" && lastProgress.snapshot && lastProgress.snapshot.execution_plan) {
-        html += `<div class="event-card"><div class="meta">ExecutionPlan 任务表</div><pre>${formatPlanTable(lastProgress.snapshot.execution_plan)}</pre></div>`;
-      }
-      if (!events.length && !html) {
-        modalBody.innerHTML = "<p>该节点暂无事件记录。</p>";
-      } else {
-        html += events.map((e) => {
-          const t = (e.created_at || "").replace("T", " ").slice(0, 19);
-          const payload = JSON.stringify(e.payload || {}, null, 2);
-          return `<div class="event-card">
-            <div class="meta">${t} · ${e.event_type}</div>
-            <div>${e.summary || ""}</div>
-            <pre>${payload}</pre>
-          </div>`;
-        }).join("");
-        modalBody.innerHTML = html;
-      }
-      modal.classList.add("open");
-    }
 
-    function openEventModal(entry) {
-      modalTitle.textContent = entry.node_id || entry.event_type || "事件详情";
-      modalBody.innerHTML = `<div class="event-card">
-        <div class="meta">${(entry.created_at || "").replace("T", " ").slice(0, 19)} · ${entry.event_type}</div>
-        <div>${entry.summary || ""}</div>
-        <pre>${JSON.stringify(entry.payload || {}, null, 2)}</pre>
-      </div>`;
-      modal.classList.add("open");
-    }
-
-    document.getElementById("modal-close").onclick = () => modal.classList.remove("open");
-    modal.onclick = (e) => { if (e.target === modal) modal.classList.remove("open"); };
-
-    function formatPlanTable(plan) {
-      if (!plan || !plan.phases) return "";
-      const lines = [
-        `intent: ${plan.intent_summary || ""}`,
-        `band: ${plan.complexity_band} · profile: ${plan.orchestrator_profile} · source: ${plan.source || "?"}`,
-        "",
-      ];
-      (plan.phases || []).forEach((ph) => {
-        lines.push(`▸ ${ph.id} — ${ph.title}${ph.parallel ? " [parallel]" : ""}`);
-        (ph.tasks || []).forEach((t) => {
-          lines.push(`    ${t.id} | ${t.worker} | ${t.tool || "-"} | ${t.goal}`);
-        });
-        lines.push("");
-      });
-      return lines.join("\n");
-    }
-
-    function showPlanPanel(snap) {
-      const plan = snap && snap.execution_plan;
-      if (!plan || !plan.phases || !plan.phases.length) {
-        planPanel.classList.remove("visible");
-        planBody.textContent = "Orchestrator 产出计划后显示在此；也可点击图中 Orchestrator 节点查看。";
-        return;
-      }
-      planBody.textContent = formatPlanTable(plan);
-      planPanel.classList.add("visible");
-    }
-
-    function openPlanModal() {
-      const plan = lastProgress && lastProgress.snapshot && lastProgress.snapshot.execution_plan;
-      if (!plan) return;
-      modalTitle.textContent = "任务表 ExecutionPlan";
-      modalBody.innerHTML = `<pre style="margin:0;font-size:0.8rem;line-height:1.5">${formatPlanTable(plan)}</pre>`;
-      modal.classList.add("open");
-    }
-
-    async function loadHistory(selectRunId) {
-      try {
-        const res = await fetch("/api/runs?limit=30");
-        if (!res.ok) throw new Error("HTTP " + res.status);
-        const data = await res.json();
-        const runs = data.runs || [];
-        if (!runs.length) {
-          historyList.textContent = "暂无记录";
-          return;
+      if (nodeId === "orchestrator_plan" && plan) {
+        html += `<div style="font-weight:650;margin-bottom:8px">📋 任务表 ExecutionPlan</div>`;
+        html += formatPlanCards(plan);
+      } else if (nodeId.startsWith("worker_")) {
+        const worker = nodeId.replace("worker_", "");
+        const tasks = tasksForWorker(plan, worker);
+        html += `<div style="font-weight:650;margin-bottom:8px">Worker: ${escapeHtml(worker)}</div>`;
+        if (tasks.length) {
+          tasks.forEach(({ task }) => {
+            html += `<div class="task-card">
+              <div class="row"><span class="tag tool">${escapeHtml(task.tool || "—")}</span></div>
+              <div class="goal">${escapeHtml(task.goal)}</div>
+            </div>`;
+          });
+        } else {
+          html += `<p style="color:var(--muted)">任务表中暂无 ${escapeHtml(worker)} 任务</p>`;
         }
-        historyList.innerHTML = runs.map((r) => {
-          const t = (r.created_at || "").replace("T", " ").slice(5, 16);
-          const extra = r.task_count ? ` · ${r.phase_count}ph/${r.task_count}tk` : "";
-          const worker = r.primary_worker ? ` → ${r.primary_worker}` : "";
-          return `<div class="history-item ${r.status}${r.run_id === selectRunId ? " active" : ""}" data-id="${r.run_id}">
-            <div class="cmd">${r.command || "(empty)"}</div>
-            <div class="meta">${t} · ${r.status}${worker}${extra}</div>
+      } else if (nodeId === "triage_score") {
+        const ev = events.find((e) => e.event_type === "triage_routing");
+        if (ev && ev.payload) {
+          const rc = ev.payload.routing_context || ev.payload;
+          html += `<div class="task-card">
+            <div class="row"><span class="tag">${escapeHtml(rc.worker || ev.payload.worker || "?")}</span></div>
+            <div class="goal">任务类型: ${escapeHtml(rc.task_type || ev.payload.task_type || "?")}<br>复杂度: ${escapeHtml(rc.complexity_band || "?")}</div>
           </div>`;
-        }).join("");
-        historyList.querySelectorAll(".history-item").forEach((el) => {
-          el.onclick = () => loadRun(el.dataset.id);
+        }
+      } else if (nodeId === "execute_plan_phase") {
+        const ev = events.filter((e) => e.event_type === "plan_phase_executed");
+        ev.forEach((e) => {
+          html += `<div class="task-card"><div class="goal">Phase ${escapeHtml(e.payload.phase_id || "")} · workers: ${escapeHtml((e.payload.workers || []).join(", "))}</div></div>`;
         });
-      } catch (e) {
-        historyList.textContent = "历史加载失败，请刷新";
       }
-    }
 
-    async function loadRun(runId) {
-      currentRunId = runId;
-      lastShownError = "";
-      const res = await fetch("/api/runs/" + runId + "/progress");
-      const data = await res.json();
-      runLabel.textContent = runId;
-      applyProgress(data);
-      loadHistory(runId);
-      if (data.snapshot && data.snapshot.command) {
-        addMessage("system", "已加载历史: " + data.snapshot.command);
+      if (events.length) {
+        html += `<div style="font-weight:650;margin:12px 0 6px;font-size:0.75rem">事件日志 (${events.length})</div>`;
+        events.forEach((e) => {
+          const err = e.event_type.includes("failed");
+          html += `<div class="event-row${err ? " err" : ""}">
+            <div class="time">${escapeHtml((e.created_at || "").replace("T"," ").slice(0,19))} · ${escapeHtml(e.event_type)}</div>
+            <div class="sum">${escapeHtml(e.summary || "")}</div>
+            ${e.payload && Object.keys(e.payload).length ? `<pre>${escapeHtml(JSON.stringify(e.payload, null, 2))}</pre>` : ""}
+          </div>`;
+        });
+      } else if (!html) {
+        html = `<p style="color:var(--muted)">该节点尚未执行或无事件记录。<br>发送命令开始运行后可查看详情。</p>`;
       }
-      connectStream(runId);
-    }
 
-    document.getElementById("plan-expand").onclick = openPlanModal;
+      detailBody.innerHTML = html;
+      renderGraph(lastProgress);
+    }
 
     function applyProgress(data) {
       lastProgress = data;
       renderGraph(data);
-      renderTimeline(data);
       const err = data.run_error || (data.snapshot && data.snapshot.error);
       showRunError(err || null);
       if (data.snapshot) {
         runLabel.textContent = data.snapshot.run_id || currentRunId || "idle";
-        const st = data.snapshot.status || data.run_status || "ready";
-        statusLabel.textContent = statusLabelText(st);
-        statusLabel.className = (st === "AWAITING_REVIEW" || st === "COMPLETED") ? "status-ok" : "";
+        setStatus(data.snapshot.status || data.run_status);
         setReviewMode(data.snapshot);
-        showPlanPanel(data.snapshot);
-        if (data.snapshot.status === "FAILED" && data.snapshot.error) {
-          sendBtn.disabled = false;
+        if (selectedNodeId) renderNodeDetail(selectedNodeId);
+        else if (data.snapshot.execution_plan && data.snapshot.execution_plan.phases) {
+          renderNodeDetail("orchestrator_plan");
         }
+        if (data.snapshot.status === "FAILED") sendBtn.disabled = false;
       }
     }
 
-    function nodeCenter(n) {
-      return { x: n.x + n.w / 2, y: n.y + n.h / 2 };
-    }
+    function nodeCenter(n) { return { x: n.x + n.w / 2, y: n.y + n.h / 2 }; }
 
     function renderGraph(data) {
       if (!data || !data.nodes) return;
-      graphMeta.nodes = data.nodes;
-      graphMeta.edges = data.edges || data.graph?.edges || [];
+      const edges = data.edges || data.graph?.edges || [];
       const nodeMap = {};
       data.nodes.forEach((n) => { nodeMap[n.id] = n; });
-
       const doneSet = new Set(data.nodes.filter((n) => n.status === "done").map((n) => n.id));
       const activeId = data.active_node;
 
-      let svgHtml = '<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#999"/></marker></defs>';
+      let svgHtml = '<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#a1a1aa"/></marker></defs>';
 
-      graphMeta.edges.forEach((e) => {
-        const a = nodeMap[e.from];
-        const b = nodeMap[e.to];
+      edges.forEach((e) => {
+        const a = nodeMap[e.from], b = nodeMap[e.to];
         if (!a || !b) return;
-        const ca = nodeCenter(a);
-        const cb = nodeCenter(b);
-        const onPath = e.path === "B" ? "path-b" : "";
+        const ca = nodeCenter(a), cb = nodeCenter(b);
         const lit = doneSet.has(e.from) && (doneSet.has(e.to) || b.id === activeId) ? " active" : "";
-        svgHtml += `<line class="g-edge ${onPath}${lit}" x1="${ca.x}" y1="${ca.y + a.h/2}" x2="${cb.x}" y2="${cb.y - b.h/2}" marker-end="url(#arrow)"/>`;
+        svgHtml += `<line class="g-edge${e.path === "B" ? " path-b" : ""}${lit}" x1="${ca.x}" y1="${ca.y + a.h/2}" x2="${cb.x}" y2="${cb.y - b.h/2}" marker-end="url(#arrow)"/>`;
       });
 
       data.nodes.forEach((n) => {
-        const st = n.status || "pending";
+        let st = n.status || "pending";
+        if (n.id === selectedNodeId) st += " selected";
         const cx = n.x + n.w / 2;
-        const textFill = st === "done" ? "#fff" : "#000";
-        const subFill = st === "done" ? "#ccc" : "#666";
-        svgHtml += `<g class="g-node ${st}" data-id="${n.id}">`;
-        svgHtml += `<rect x="${n.x}" y="${n.y}" width="${n.w}" height="${n.h}" rx="3"/>`;
-        svgHtml += `<text x="${cx}" y="${n.y + 14}" text-anchor="middle" font-size="10" font-weight="600" fill="${textFill}">${n.label}</text>`;
-        svgHtml += `<text class="sub" x="${cx}" y="${n.y + 26}" text-anchor="middle" font-size="8" fill="${subFill}">${n.sublabel || ""}</text>`;
-        if (st === "active") {
-          svgHtml += `<text x="${n.x + n.w - 4}" y="${n.y + 10}" text-anchor="end" font-size="7" fill="#000">●</text>`;
-        }
-        if (st === "failed") {
-          svgHtml += `<text x="${n.x + n.w - 4}" y="${n.y + 10}" text-anchor="end" font-size="8" fill="#c00">!</text>`;
-        }
+        const tf = n.status === "done" ? "#fff" : "#18181b";
+        const sf = n.status === "done" ? "#d4d4d8" : "#71717a";
+        svgHtml += `<g class="g-node ${st}" data-id="${n.id}" role="button" tabindex="0">`;
+        svgHtml += `<rect x="${n.x}" y="${n.y}" width="${n.w}" height="${n.h}" rx="6"/>`;
+        svgHtml += `<text x="${cx}" y="${n.y + 15}" text-anchor="middle" font-size="10" font-weight="600" fill="${tf}">${n.label}</text>`;
+        svgHtml += `<text class="sub" x="${cx}" y="${n.y + 27}" text-anchor="middle" font-size="8" fill="${sf}">${n.sublabel || ""}</text>`;
+        if (n.status === "failed") svgHtml += `<text x="${n.x + n.w - 5}" y="${n.y + 12}" text-anchor="end" font-size="9" fill="#dc2626">!</text>`;
         svgHtml += "</g>";
       });
 
-      svgHtml += `<text x="120" y="88" font-size="9" fill="#999" text-anchor="middle">Path B</text>`;
-      svgHtml += `<text x="400" y="88" font-size="9" fill="#000" text-anchor="middle" font-weight="600">Path A</text>`;
-
       svg.innerHTML = svgHtml;
       svg.querySelectorAll(".g-node").forEach((g) => {
-        g.onclick = () => openNodeModal(g.getAttribute("data-id"));
-      });
-
-      if (activeId && nodeMap[activeId]) {
-        const n = nodeMap[activeId];
-        document.getElementById("graph-wrap").scrollTo({
-          top: Math.max(0, n.y - 80), behavior: "smooth"
-        });
-      }
-    }
-
-    function renderTimeline(data) {
-      const tl = data.timeline || [];
-      if (!tl.length) {
-        timelineEl.textContent = "运行后此处显示事件流 · 点击节点或事件查看详情";
-        return;
-      }
-      timelineEl.innerHTML = tl.slice(-12).map((e, i) => {
-        const err = e.event_type === "devlab_run_failed" || e.event_type === "validation_failed";
-        const idx = tl.length - tl.slice(-12).length + i;
-        return `<div class="timeline-row${err ? " err" : ""}" data-idx="${idx}">${(e.created_at || "").slice(11, 19)} [${e.node_id || "-"}] ${e.summary}</div>`;
-      }).join("");
-      timelineEl.querySelectorAll(".timeline-row").forEach((row) => {
-        row.onclick = () => openEventModal(tl[Number(row.dataset.idx)]);
+        const id = g.getAttribute("data-id");
+        g.onclick = () => renderNodeDetail(id);
+        g.onkeydown = (e) => { if (e.key === "Enter") renderNodeDetail(id); };
       });
     }
 
     async function loadArchitecture() {
       const res = await fetch("/api/architecture");
-      const data = await res.json();
-      applyProgress(data);
+      applyProgress(await res.json());
     }
 
     function setReviewMode(snap) {
-      const panel = document.querySelector(".chat-panel");
       if (snap && snap.waiting_review) {
         reviewBox.classList.add("visible");
         mainComposer.style.display = "none";
-        reviewPreview.textContent = snap.interrupt_message || "(无产出内容)";
-        panel.classList.add("review-mode");
+        reviewPreview.textContent = snap.interrupt_message || "(无产出)";
+        chatPanel.classList.add("review-mode");
       } else {
         reviewBox.classList.remove("visible");
         mainComposer.style.display = "flex";
-        panel.classList.remove("review-mode");
+        chatPanel.classList.remove("review-mode");
       }
     }
 
@@ -665,12 +633,11 @@
       if (pollTimer) clearInterval(pollTimer);
       pollTimer = setInterval(async () => {
         const res = await fetch("/api/runs/" + runId + "/progress");
-        const data = await res.json();
-        applyProgress(data);
-        if (data.snapshot && ["COMPLETED", "FAILED", "BLOCKED"].includes(data.snapshot.status)) {
+        applyProgress(await res.json());
+        const st = lastProgress && lastProgress.snapshot && lastProgress.snapshot.status;
+        if (["COMPLETED", "FAILED", "BLOCKED"].includes(st)) {
           clearInterval(pollTimer);
           sendBtn.disabled = false;
-          loadHistory(currentRunId);
         }
       }, 400);
     }
@@ -693,7 +660,7 @@
       if (!text) return;
       if (isArchQuery(text)) {
         addMessage("user", text);
-        addMessage("assistant", "右侧为全局架构图：\n· Path A（中）Dev Lab / pah run 走完整 LangGraph\n· Path B（左）Telegram IG/视频 直达 SMAS/PIP\n· Execute Phase 下分岔到 Searcher/Creator/Executor/External\n运行命令后节点会实时变黑高亮。");
+        addMessage("assistant", "右侧为 LangGraph 完整流程图。\n点击任意节点可查看该步骤的任务详情与事件日志。\n拖动中间分隔条可调整左右宽度。");
         inputEl.value = "";
         loadArchitecture();
         return;
@@ -701,6 +668,7 @@
       sendBtn.disabled = true;
       addMessage("user", text);
       inputEl.value = "";
+      selectedNodeId = null;
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -709,8 +677,7 @@
       const data = await res.json();
       currentRunId = data.run_id;
       runLabel.textContent = currentRunId;
-      addMessage("system", "Run: " + currentRunId);
-      loadHistory(currentRunId);
+      addMessage("system", "运行已开始");
       connectStream(currentRunId);
     }
 
@@ -730,11 +697,8 @@
       }).then(() => connectStream(currentRunId));
     };
 
-    loadArchitecture().catch((e) => {
-      addMessage("error", "页面初始化失败: " + e.message);
-    });
-    loadHistory().catch(() => {});
-    addMessage("system", "左侧=运行历史，点击可回看。Orchestrator 产出任务表后自动展示。点击架构节点看详情。");
+    loadArchitecture().catch((e) => addMessage("error", "初始化失败: " + e.message));
+    addMessage("system", "拖动中间竖条调整宽度 · 点击架构节点查看任务详情");
   </script>
 </body>
 </html>

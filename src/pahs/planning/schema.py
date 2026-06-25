@@ -45,6 +45,31 @@ class PlanPhase(BaseModel):
         return text
 
 
+_BAND_ALIASES = {
+    "low": "simple",
+    "high": "complex",
+    "simple": "simple",
+    "medium": "medium",
+    "complex": "complex",
+}
+_PROFILE_ALIASES = {
+    "simple": "lite",
+    "lite": "lite",
+    "full": "full",
+    "research": "full",
+    "deep": "full",
+    "standard": "lite",
+}
+
+
+def normalize_complexity_band(value: str | None, *, default: str = "medium") -> str:
+    return _BAND_ALIASES.get(str(value or default).lower(), default)
+
+
+def normalize_orchestrator_profile(value: str | None, *, default: str = "lite") -> str:
+    return _PROFILE_ALIASES.get(str(value or default).lower(), default)
+
+
 class ExecutionPlan(BaseModel):
     plan_version: int = 1
     intent_summary: str
@@ -56,6 +81,16 @@ class ExecutionPlan(BaseModel):
     )
     phases: list[PlanPhase] = Field(min_length=1)
     source: str = "orchestrator"
+
+    @field_validator("complexity_band", mode="before")
+    @classmethod
+    def _normalize_band(cls, value: Any) -> str:
+        return normalize_complexity_band(str(value) if value is not None else None)
+
+    @field_validator("orchestrator_profile", mode="before")
+    @classmethod
+    def _normalize_profile(cls, value: Any) -> str:
+        return normalize_orchestrator_profile(str(value) if value is not None else None)
 
     def phase_count(self) -> int:
         return len(self.phases)

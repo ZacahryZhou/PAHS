@@ -59,6 +59,12 @@ def post_chat(body: ChatRequest) -> dict[str, Any]:
     }
 
 
+@app.get("/api/runs")
+def list_runs(limit: int = 30) -> dict[str, Any]:
+    runs = db.list_recent_runs(limit=max(1, min(limit, 100)))
+    return {"runs": runs, "count": len(runs)}
+
+
 @app.get("/api/runs/{run_id}")
 def get_run(run_id: str) -> dict[str, Any]:
     snapshot = run_snapshot(run_id)

@@ -93,6 +93,50 @@ def get_run(run_id: str) -> dict[str, Any] | None:
     return dict(row) if row else None
 
 
+def list_recent_runs(*, limit: int = 30) -> list[dict[str, Any]]:
+    with connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT run_id, command, status, origin_channel, created_at, updated_at,
+                   orchestrator_profile, plan_json
+            FROM runs
+            ORDER BY id DESC
+            LIMIT ?
+            """,
+            (limit,),
+        ).fetchall()
+    results: list[dict[str, Any]] = []
+    for row in rows:
+        item = dict(row)
+        plan_source = None
+        phase_count = 0
+        task_count = 0
+        primary_worker = None
+        if item.get("plan_json"):
+            try:
+                plan = json.loads(item["plan_json"])
+                ep = plan.get("execution_plan") or {}
+                plan_source = plan.get("plan_source")
+                phases = ep.get("phases") or []
+                phase_count = len(phases)
+                task_count = sum(len(p.get("tasks") or []) for p in phases)
+                if phases and phases[0].get("tasks"):
+                    primary_worker = phases[0]["tasks"][0].get("worker")
+            except json.JSONDecodeError:
+                pass
+        item.pop("plan_json", None)
+        item.update(
+            {
+                "plan_source": plan_source,
+                "phase_count": phase_count,
+                "task_count": task_count,
+                "primary_worker": primary_worker,
+            }
+        )
+        results.append(item)
+    return results
+
+
 def enqueue_review(
     run_id: str,
     review_type: str,

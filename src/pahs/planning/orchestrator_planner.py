@@ -7,7 +7,7 @@ from typing import Any
 
 from pahs.planning.capability_catalog import build_capability_catalog, format_catalog_for_prompt
 from pahs.planning.plan_patterns import format_patterns_for_prompt, load_plan_patterns
-from pahs.planning.schema import ExecutionPlan, PlanPhase, PlanTask
+from pahs.planning.schema import ExecutionPlan, PlanPhase, PlanTask, normalize_complexity_band, normalize_orchestrator_profile
 from pahs.providers.router import active_provider_name, llm_complete
 
 
@@ -45,8 +45,8 @@ def plan_fallback_from_context(
     )
     return ExecutionPlan(
         intent_summary=command[:240],
-        complexity_band=complexity_band,  # type: ignore[arg-type]
-        orchestrator_profile=orchestrator_profile,  # type: ignore[arg-type]
+        complexity_band=normalize_complexity_band(complexity_band),  # type: ignore[arg-type]
+        orchestrator_profile=normalize_orchestrator_profile(orchestrator_profile),  # type: ignore[arg-type]
         task_type=task_type,
         review_policy={"milestone_reviews": "per_phase"},
         phases=[PlanPhase(id="phase_1", title="Execute", parallel=False, tasks=[task])],
@@ -54,15 +54,13 @@ def plan_fallback_from_context(
     )
 
 
-_BAND_MAP = {"low": "simple", "high": "complex", "simple": "simple", "medium": "medium", "complex": "complex"}
-_PROFILE_MAP = {"simple": "lite", "lite": "lite", "full": "full"}
-
-
 def _normalize_plan_payload(payload: dict[str, Any]) -> None:
-    band = str(payload.get("complexity_band", "medium")).lower()
-    payload["complexity_band"] = _BAND_MAP.get(band, "medium")
-    profile = str(payload.get("orchestrator_profile", "lite")).lower()
-    payload["orchestrator_profile"] = _PROFILE_MAP.get(profile, "lite")
+    payload["complexity_band"] = normalize_complexity_band(
+        str(payload.get("complexity_band", "medium"))
+    )
+    payload["orchestrator_profile"] = normalize_orchestrator_profile(
+        str(payload.get("orchestrator_profile", "lite"))
+    )
 
 
 def _parse_plan_json(raw: str, command: str) -> ExecutionPlan:

@@ -34,8 +34,56 @@
     main {
       flex: 1;
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: 220px 1fr 1fr;
       min-height: 0;
+    }
+    .history-panel {
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid var(--border);
+      min-height: 0;
+      background: #fafafa;
+    }
+    #history-list {
+      flex: 1;
+      overflow-y: auto;
+      font-size: 0.72rem;
+    }
+    .history-item {
+      padding: 8px 10px;
+      border-bottom: 1px solid var(--border);
+      cursor: pointer;
+    }
+    .history-item:hover { background: #f0f0f0; }
+    .history-item.active { background: #000; color: #fff; }
+    .history-item .cmd { font-weight: 600; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .history-item .meta { font-family: monospace; font-size: 0.65rem; opacity: 0.8; }
+    .history-item.FAILED .cmd { color: inherit; }
+    #plan-panel {
+      display: none;
+      margin: 0 12px 8px;
+      border: 1px solid var(--border);
+      background: #f9f9f9;
+      max-height: 180px;
+      overflow: hidden;
+      flex-direction: column;
+    }
+    #plan-panel.visible { display: flex; }
+    #plan-panel header {
+      padding: 6px 8px;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.7rem;
+      font-weight: 600;
+      display: flex;
+      justify-content: space-between;
+    }
+    #plan-body {
+      padding: 8px;
+      overflow-y: auto;
+      font-family: monospace;
+      font-size: 0.68rem;
+      white-space: pre-wrap;
+      line-height: 1.4;
     }
     .chat-panel {
       display: flex;
@@ -232,9 +280,17 @@
     <div class="meta"><span id="run-label">idle</span> · <span id="status-label">ready</span></div>
   </header>
   <main>
+    <section class="history-panel">
+      <div class="panel-title">运行历史</div>
+      <div id="history-list">加载中…</div>
+    </section>
     <section class="chat-panel">
       <div class="panel-title">Chat</div>
       <div id="error-banner"></div>
+      <div id="plan-panel">
+        <header><span>任务表 ExecutionPlan</span><button type="button" class="secondary" id="plan-close" style="padding:2px 6px;font-size:0.65rem">收起</button></header>
+        <div id="plan-body"></div>
+      </div>
       <div id="messages"></div>
       <div class="review-box" id="review-box">
         <div class="review-preview" id="review-preview"></div>
@@ -286,6 +342,9 @@
     const modal = document.getElementById("modal");
     const modalTitle = document.getElementById("modal-title");
     const modalBody = document.getElementById("modal-body");
+    const historyList = document.getElementById("history-list");
+    const planPanel = document.getElementById("plan-panel");
+    const planBody = document.getElementById("plan-body");
 
     let currentRunId = null;
     let eventSource = null;
@@ -356,6 +415,71 @@
     document.getElementById("modal-close").onclick = () => modal.classList.remove("open");
     modal.onclick = (e) => { if (e.target === modal) modal.classList.remove("open"); };
 
+    function formatPlanTable(plan) {
+      if (!plan || !plan.phases) return "";
+      const lines = [
+        `intent: ${plan.intent_summary || ""}`,
+        `band: ${plan.complexity_band} · profile: ${plan.orchestrator_profile} · source: ${plan.source || "?"}`,
+        "",
+      ];
+      (plan.phases || []).forEach((ph) => {
+        lines.push(`▸ ${ph.id} — ${ph.title}${ph.parallel ? " [parallel]" : ""}`);
+        (ph.tasks || []).forEach((t) => {
+          lines.push(`    ${t.id} | ${t.worker} | ${t.tool || "-"} | ${t.goal}`);
+        });
+        lines.push("");
+      });
+      return lines.join("\n");
+    }
+
+    function showPlanPanel(snap) {
+      const plan = snap && snap.execution_plan;
+      if (!plan || !plan.phases || !plan.phases.length) {
+        planPanel.classList.remove("visible");
+        return;
+      }
+      planBody.textContent = formatPlanTable(plan);
+      planPanel.classList.add("visible");
+    }
+
+    async function loadHistory(selectRunId) {
+      const res = await fetch("/api/runs?limit=30");
+      const data = await res.json();
+      const runs = data.runs || [];
+      if (!runs.length) {
+        historyList.textContent = "暂无记录";
+        return;
+      }
+      historyList.innerHTML = runs.map((r) => {
+        const t = (r.created_at || "").replace("T", " ").slice(5, 16);
+        const extra = r.task_count ? ` · ${r.phase_count}ph/${r.task_count}tk` : "";
+        const worker = r.primary_worker ? ` → ${r.primary_worker}` : "";
+        return `<div class="history-item ${r.status}${r.run_id === selectRunId ? " active" : ""}" data-id="${r.run_id}">
+          <div class="cmd">${r.command || "(empty)"}</div>
+          <div class="meta">${t} · ${r.status}${worker}${extra}</div>
+        </div>`;
+      }).join("");
+      historyList.querySelectorAll(".history-item").forEach((el) => {
+        el.onclick = () => loadRun(el.dataset.id);
+      });
+    }
+
+    async function loadRun(runId) {
+      currentRunId = runId;
+      lastShownError = "";
+      const res = await fetch("/api/runs/" + runId + "/progress");
+      const data = await res.json();
+      runLabel.textContent = runId;
+      applyProgress(data);
+      loadHistory(runId);
+      if (data.snapshot && data.snapshot.command) {
+        addMessage("system", "已加载历史: " + data.snapshot.command);
+      }
+      connectStream(runId);
+    }
+
+    document.getElementById("plan-close").onclick = () => planPanel.classList.remove("visible");
+
     function applyProgress(data) {
       lastProgress = data;
       renderGraph(data);
@@ -366,6 +490,7 @@
         runLabel.textContent = data.snapshot.run_id || currentRunId || "idle";
         statusLabel.textContent = data.snapshot.status || data.run_status || "ready";
         setReviewMode(data.snapshot);
+        showPlanPanel(data.snapshot);
         if (data.snapshot.status === "FAILED" && data.snapshot.error) {
           sendBtn.disabled = false;
         }
@@ -476,6 +601,7 @@
         if (data.snapshot && ["COMPLETED", "FAILED", "BLOCKED"].includes(data.snapshot.status)) {
           clearInterval(pollTimer);
           sendBtn.disabled = false;
+          loadHistory(currentRunId);
         }
       }, 400);
     }
@@ -515,6 +641,7 @@
       currentRunId = data.run_id;
       runLabel.textContent = currentRunId;
       addMessage("system", "Run: " + currentRunId);
+      loadHistory(currentRunId);
       connectStream(currentRunId);
     }
 
@@ -535,7 +662,8 @@
     };
 
     loadArchitecture();
-    addMessage("system", "右侧 = 全局架构图。点击任意节点查看该步详细事件与 payload；出错会红框标出并显示完整错误。");
+    loadHistory();
+    addMessage("system", "左侧=运行历史，点击可回看。Orchestrator 产出任务表后自动展示。点击架构节点看详情。");
   </script>
 </body>
 </html>

@@ -456,6 +456,24 @@ def externals_test(agent_name: str, message: str) -> None:
     typer.echo(json.dumps(result, ensure_ascii=False, indent=2))
 
 
+@app.command("dev-ui")
+def dev_ui(
+    host: str = typer.Option("127.0.0.1", help="Bind host"),
+    port: int = typer.Option(8765, help="Bind port"),
+) -> None:
+    """Start local Dev Lab chat UI for testing (http://127.0.0.1:8765)."""
+    from pahs.devlab.server import run_server
+    from pahs.env import load_project_env
+
+    load_project_env()
+    db.init_db()
+    url = f"http://{host}:{port}"
+    typer.echo(f"PAHS Dev Lab running at {url}")
+    typer.echo("Open this URL in your browser to chat and watch architecture progress.")
+    typer.echo("在浏览器打开上述地址，进行聊天测试并查看实时架构进度。")
+    run_server(host=host, port=port)
+
+
 @app.command("telegram")
 def telegram_bot() -> None:
     """Start the Telegram gateway bot."""

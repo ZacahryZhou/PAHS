@@ -390,6 +390,10 @@ pah run "Research LangGraph and summarize in Chinese"
 # Telegram bot
 pah telegram
 
+# Dev Lab — chat UI + live architecture progress
+pah dev-ui
+# open http://127.0.0.1:8765
+
 # Preview internal plan without executing
 pah plan-preview "调研 Perplexity 和 Tavily，然后做一条 IG 图文"
 ```
@@ -409,6 +413,7 @@ pah plan-preview "调研 Perplexity 和 Tavily，然后做一条 IG 图文"
 | `pah reply <run_id> "approved"` | 回复阶段审核 |
 | `pah feedback <run_id> "..."` | 提交总反馈 → Learner |
 | `pah proposals pending` | 查看学习提案 |
+| `pah dev-ui` | 本地 Dev Lab 测试页（聊天 + 架构进度） |
 | `pah telegram` | 启动 Telegram bot |
 
 ---

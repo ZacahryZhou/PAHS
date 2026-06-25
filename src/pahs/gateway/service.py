@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from pahs.external.registry import match_external_agent
 from pahs.gateway.run_ids import new_run_id
 from pahs.graph.runner import resume_run, start_run
 from pahs.storage import db
@@ -27,6 +28,23 @@ def parse_run_command(text: str) -> str | None:
     stripped = text.strip()
     if stripped.lower().startswith("run "):
         return stripped[4:].strip()
+    if match_external_agent(stripped):
+        return stripped
+    return None
+
+
+def _interrupt_message(result: dict[str, Any]) -> str | None:
+    interrupts = result.get("__interrupt__")
+    if not interrupts:
+        return None
+    item = interrupts[0]
+    value = getattr(item, "value", item)
+    if not isinstance(value, dict):
+        return None
+    if value.get("type") == "milestone_review":
+        return str(value.get("presentation") or "")
+    if value.get("type") == "final_feedback":
+        return str(value.get("final_response") or "")
     return None
 
 
@@ -71,14 +89,24 @@ def handle_inbound_text(
     if command:
         run_id = new_run_id()
         result = start_run(run_id, command, channel=channel)
-        return {"action": "run", "run_id": run_id, "result": result}
+        return {
+            "action": "run",
+            "run_id": run_id,
+            "command": command,
+            "result": result,
+            "interrupt_message": _interrupt_message(result),
+        }
 
     return {
         "action": "help",
         "message": (
-            "Use:\n"
+            "PAHS main agent ready.\n\n"
+            "Start a task:\n"
             "run <command>\n"
-            "reply <run_id> <message>\n"
+            "@smas <IG post task>\n"
+            "@pip <video task>\n\n"
+            "Review:\n"
+            "reply <run_id> approved\n"
             "pending"
         ),
     }

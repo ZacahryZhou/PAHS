@@ -1,11 +1,46 @@
 # Register local agents/tools PAHS can delegate to.
-# 注册本机可被 PAHS 自动调用的外部 agent / 工具。
+# PAHS 是主控；下面是「工具型」子项目。
 
 external_agents:
-  openclaw:
+  smas:
     enabled: true
+    type: smas
+    description: SMAS — generate Instagram post content and preview image
+    project_dir: ~/Desktop/SMAS
+    subcommand: message
+    timeout_seconds: 900
+    match_keywords:
+      - smas
+      - instagram
+      - ins post
+      - ig post
+      - 发帖
+      - 图文
+    match_prefixes:
+      - "@smas"
+      - "smas:"
+
+  pip:
+    enabled: true
+    type: pip
+    description: PIP — generate short video from text prompt
+    project_dir: ~/Desktop/PIP
+    mock: false
+    skip_approval: true
+    timeout_seconds: 3600
+    match_keywords:
+      - pip
+      - 短视频
+      - 生成视频
+      - promo video
+    match_prefixes:
+      - "@pip"
+      - "pip:"
+
+  openclaw:
+    enabled: false
     type: openclaw
-    description: OpenClaw local agent (gateway or embedded)
+    description: OpenClaw local agent (optional; disable if using SMAS/PIP only)
     binary: openclaw
     default_agent: main
     use_local: true
@@ -16,21 +51,6 @@ external_agents:
       - open claw
       - 用openclaw
       - 调用openclaw
-      - 交给openclaw
     match_prefixes:
       - "@openclaw"
       - "openclaw:"
-      - "claw:"
-
-  # Example shell bridge — enable and edit for your own project.
-  # shell_edusync:
-  #   enabled: false
-  #   type: shell
-  #   description: Run a command in EduSync project folder
-  #   working_directory: ~/Desktop/EduSync
-  #   command:
-  #     - bash
-  #     - -lc
-  #     - echo "TODO: wire your project CLI here: $PAHS_PROMPT"
-  #   match_keywords:
-  #     - edusync

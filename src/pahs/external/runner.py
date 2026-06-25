@@ -5,12 +5,14 @@ from __future__ import annotations
 from typing import Any
 
 from pahs.external.openclaw_bridge import run_openclaw
+from pahs.external.pip_bridge import run_pip
 from pahs.external.registry import (
     ExternalAgentSpec,
     get_external_agent,
     strip_external_prefix,
 )
 from pahs.external.shell_bridge import run_shell_bridge
+from pahs.external.smas_bridge import run_smas
 from pahs.storage import db
 
 
@@ -30,6 +32,10 @@ def run_external_agent(
 
     if spec.type == "openclaw":
         result = run_openclaw(spec, prompt)
+    elif spec.type == "smas":
+        result = run_smas(spec, prompt)
+    elif spec.type == "pip":
+        result = run_pip(spec, prompt)
     elif spec.type == "shell":
         result = run_shell_bridge(spec, prompt)
     else:

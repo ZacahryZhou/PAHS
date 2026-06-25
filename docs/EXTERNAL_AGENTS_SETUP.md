@@ -69,22 +69,21 @@ pah externals list
 
 ## 3. How auto-routing works
 
-If your command matches keywords or prefixes in `external_agents.yaml`, PAHS routes to worker `external`.
+PAHS is the **main controller**. SMAS and PIP are **tools**.
 
-Examples:
+If your command matches keywords or prefixes, PAHS routes to that tool:
+
+| You say | PAHS calls |
+|---------|------------|
+| `@smas 给咖啡店做一条开业 IG 图文` | SMAS (`scripts/smas.sh message ...`) |
+| `@pip 做一条 10 秒咖啡品牌短视频` | PIP (`python -m video_pipeline.main --payload ...`) |
+| `write a blog post` (no tool keyword) | PAHS internal Creator + DeepSeek |
+
+Preview routing:
 
 ```bash
-pah route-preview "@openclaw summarize my notes"
-pah route-preview "用openclaw 帮我整理今天的任务"
-pah run "@openclaw list my top 3 priorities for today"
-```
-
-Preview should show:
-
-```json
-"worker": "external",
-"execution_mode": "openclaw",
-"external_match": "openclaw"
+pah route-preview "@smas create an IG post for a coffee shop opening"
+pah route-preview "@pip create a 10 second coffee promo video"
 ```
 
 ## 4. Test OpenClaw directly

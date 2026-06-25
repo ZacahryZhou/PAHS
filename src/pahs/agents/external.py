@@ -5,13 +5,12 @@ from __future__ import annotations
 from pahs.external.registry import get_external_agent
 from pahs.external.runner import format_external_output, run_external_agent
 from pahs.graph.state import PAHSState
+from pahs.planning.task_context import effective_task_prompt
 
 
 def external_agent_node(state: PAHSState) -> dict:
     agent_name = state.get("execution_mode") or state.get("external_agent", "")
-    command = state["user_command"]
-    feedback = state.get("user_milestone_review", "").strip()
-    prompt = feedback or command
+    prompt = effective_task_prompt(state)
 
     spec = get_external_agent(agent_name)
     if spec is None:

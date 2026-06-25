@@ -1,0 +1,44 @@
+{
+  "title": "IG post with optional research",
+  "summary": "Research first when the user asks for context, then creator caption, then SMAS visual.",
+  "trigger_keywords": ["ig", "instagram", "图文", "发帖", "ins"],
+  "phases": [
+    {
+      "id": "phase_research",
+      "title": "Research",
+      "parallel": true,
+      "optional": true,
+      "tasks": [
+        {
+          "worker": "searcher",
+          "tool": "search_web",
+          "goal": "Gather fresh facts and sources for the post topic"
+        }
+      ]
+    },
+    {
+      "id": "phase_content",
+      "title": "Content",
+      "depends_on": ["phase_research"],
+      "tasks": [
+        {
+          "worker": "creator",
+          "tool": "generate_content",
+          "goal": "Write IG caption from upstream research"
+        }
+      ]
+    },
+    {
+      "id": "phase_visual",
+      "title": "Visual delivery",
+      "depends_on": ["phase_content"],
+      "tasks": [
+        {
+          "worker": "external",
+          "external_agent": "smas",
+          "goal": "Generate IG preview image"
+        }
+      ]
+    }
+  ]
+}

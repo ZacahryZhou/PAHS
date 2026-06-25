@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 from pahs.graph.state import PAHSState
+from pahs.planning.task_context import effective_task_prompt
 from pahs.providers.router import llm_complete
 from pahs.tools.registry import call_tool
 
 
 def executor_node(state: PAHSState) -> dict:
     mode = state.get("execution_mode", "CODE")
-    command = state["user_command"]
+    command = effective_task_prompt(state)
     feedback = state.get("user_milestone_review", "").strip()
     model = (state.get("routing_decision") or {}).get("selected_model", "deepseek-chat")
 

@@ -7,10 +7,8 @@ from typing import Any, Literal
 from langgraph.graph import END, StateGraph
 from langgraph.types import Command, interrupt
 
-from pahs.agents.executor import executor_node
-from pahs.agents.external import external_agent_node
-from pahs.agents.searcher import searcher_node
-from pahs.agents.week1 import creator_node, orchestrator_plan_node, triage_node
+from pahs.agents.plan_nodes import execute_plan_phase_node, plan_retry_phase_node, plan_validate_node
+from pahs.agents.week1 import orchestrator_plan_node, triage_node
 from pahs.config_loader import budget_config
 from pahs.graph.checkpoints import get_checkpointer
 from pahs.graph.state import PAHSState
@@ -19,6 +17,8 @@ from pahs.harness.environment import EnvironmentMonitor
 from pahs.harness.rules import RuleEngine
 from pahs.harness.tools import list_tools_for_agent
 from pahs.harness.validation import verify_pipeline_node
+from pahs.planning.plan_executor import plan_is_complete
+from pahs.planning.schema import ExecutionPlan
 from pahs.routing.cost_estimator import record_cost_event
 from pahs.routing.no_progress import detect_no_progress, output_fingerprint
 from pahs.storage import db
@@ -43,8 +43,19 @@ def load_global_rules_node(state: PAHSState) -> dict:
     }
 
 
+def _worker_for_plan_phase(state: PAHSState) -> str:
+    raw = state.get("execution_plan")
+    if not raw:
+        return state.get("worker", "creator")
+    plan = ExecutionPlan.model_validate(raw)
+    index = int(state.get("plan_phase_index", 0))
+    if index >= plan.phase_count():
+        return state.get("worker", "creator")
+    return plan.phases[index].tasks[0].worker
+
+
 def load_target_rules_node(state: PAHSState) -> dict:
-    worker = state.get("worker", "creator")
+    worker = _worker_for_plan_phase(state)
     execution_mode = state.get("execution_mode")
     loaded = list(state.get("loaded_rules", []))
 
@@ -71,7 +82,7 @@ def load_target_rules_node(state: PAHSState) -> dict:
 
 
 def env_precheck_node(state: PAHSState) -> dict:
-    worker = state.get("worker", "creator")
+    worker = _worker_for_plan_phase(state)
     budget = BudgetManager(state["run_id"])
     monitor = EnvironmentMonitor(budget)
     result = monitor.precheck(state, step_name=f"{worker}_execute")
@@ -93,17 +104,6 @@ def env_precheck_node(state: PAHSState) -> dict:
         "cost_estimate": result.get("cost_estimate", state.get("cost_estimate")),
         "status": "ENV_OK" if result["env_check_passed"] else "BLOCKED_BY_ENV",
     }
-
-
-def worker_execute_node(state: PAHSState) -> dict:
-    worker = state.get("worker", "creator")
-    if worker == "external":
-        return external_agent_node(state)
-    if worker == "searcher":
-        return searcher_node(state)
-    if worker == "executor":
-        return executor_node(state)
-    return creator_node(state)
 
 
 def handle_verify_retry_node(state: PAHSState) -> dict:
@@ -153,6 +153,7 @@ def blocked_end_node(state: PAHSState) -> dict:
 def present_milestone_node(state: PAHSState) -> dict:
     model = (state.get("routing_decision") or {}).get("selected_model", "unknown")
     estimate = state.get("cost_estimate") or {}
+    progress = state.get("plan_progress") or ""
     presentation = (
         "## Milestone Review | 阶段审核\n\n"
         f"Run: `{state['run_id']}`\n"
@@ -161,8 +162,12 @@ def present_milestone_node(state: PAHSState) -> dict:
         f"Model: `{model}`\n"
         f"Est. cost: `${estimate.get('estimated_cost_usd', 0):.6f}`\n"
         f"Milestone: `{state.get('milestone_id', 'm1_output')}`\n"
-        f"Complexity: `{state.get('complexity_band', 'unknown')}`\n\n"
-        f"{state.get('milestone_output', '')}\n\n"
+        f"Complexity: `{state.get('complexity_band', 'unknown')}`\n"
+    )
+    if progress:
+        presentation += f"Plan: `{progress}`\n"
+    presentation += (
+        f"\n{state.get('milestone_output', '')}\n\n"
         "Reply with `approved` / `通过` to continue.\n"
         "回复 `approved` / `通过` 继续。"
     )
@@ -232,6 +237,17 @@ def route_after_verify(
     state: PAHSState,
 ) -> Literal["present", "final", "retry", "failed"]:
     if state.get("validation_passed"):
+        raw_plan = state.get("execution_plan")
+        if raw_plan:
+            plan = ExecutionPlan.model_validate(raw_plan)
+            index = int(state.get("plan_phase_index", 0))
+            policy = state.get("review_policy", {})
+            if not plan_is_complete(plan, index):
+                return "present"
+            if policy.get("milestone_reviews") == "final_only":
+                return "final"
+            return "present"
+
         policy = state.get("review_policy", {})
         if policy.get("milestone_reviews") == "final_only":
             return "final"
@@ -245,9 +261,22 @@ def route_after_verify(
     return "failed"
 
 
-def route_after_milestone_review(state: PAHSState) -> Literal["final_present", "retry_worker"]:
+def route_after_milestone_review(
+    state: PAHSState,
+) -> Literal["final_present", "retry_worker", "next_phase"]:
     text = state.get("user_milestone_review", "").strip().lower()
     approved = text in {"approved", "approve", "ok", "pass", "通过", "好", "可以", "yes"}
+
+    raw_plan = state.get("execution_plan")
+    if raw_plan:
+        plan = ExecutionPlan.model_validate(raw_plan)
+        index = int(state.get("plan_phase_index", 0))
+        if not approved:
+            return "retry_worker"
+        if plan_is_complete(plan, index):
+            return "final_present"
+        return "next_phase"
+
     if approved:
         return "final_present"
     return "retry_worker"
@@ -266,9 +295,11 @@ def build_graph():
     graph.add_node("load_global_rules", load_global_rules_node)
     graph.add_node("triage_score", triage_node)
     graph.add_node("orchestrator_plan", orchestrator_plan_node)
+    graph.add_node("plan_validate", plan_validate_node)
+    graph.add_node("execute_plan_phase", execute_plan_phase_node)
+    graph.add_node("plan_retry_phase", plan_retry_phase_node)
     graph.add_node("env_precheck", env_precheck_node)
     graph.add_node("load_target_rules", load_target_rules_node)
-    graph.add_node("worker_execute", worker_execute_node)
     graph.add_node("verify_pipeline", verify_pipeline_node)
     graph.add_node("handle_verify_retry", handle_verify_retry_node)
     graph.add_node("failed_end", failed_end_node)
@@ -282,14 +313,15 @@ def build_graph():
     graph.add_edge("ingest", "load_global_rules")
     graph.add_edge("load_global_rules", "triage_score")
     graph.add_edge("triage_score", "orchestrator_plan")
-    graph.add_edge("orchestrator_plan", "env_precheck")
+    graph.add_edge("orchestrator_plan", "plan_validate")
+    graph.add_edge("plan_validate", "env_precheck")
     graph.add_conditional_edges(
         "env_precheck",
         route_after_env,
         {"continue": "load_target_rules", "blocked": "blocked_end"},
     )
-    graph.add_edge("load_target_rules", "worker_execute")
-    graph.add_edge("worker_execute", "verify_pipeline")
+    graph.add_edge("load_target_rules", "execute_plan_phase")
+    graph.add_edge("execute_plan_phase", "verify_pipeline")
     graph.add_conditional_edges(
         "verify_pipeline",
         route_after_verify,
@@ -303,13 +335,18 @@ def build_graph():
     graph.add_conditional_edges(
         "handle_verify_retry",
         route_after_retry,
-        {"retry": "worker_execute", "failed": "failed_end"},
+        {"retry": "plan_retry_phase", "failed": "failed_end"},
     )
+    graph.add_edge("plan_retry_phase", "execute_plan_phase")
     graph.add_edge("present_milestone", "milestone_human_review")
     graph.add_conditional_edges(
         "milestone_human_review",
         route_after_milestone_review,
-        {"final_present": "final_present", "retry_worker": "load_target_rules"},
+        {
+            "final_present": "final_present",
+            "retry_worker": "plan_retry_phase",
+            "next_phase": "env_precheck",
+        },
     )
     graph.add_edge("final_present", "final_feedback_request")
     graph.add_edge("final_feedback_request", END)

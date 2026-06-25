@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pahs.config_loader import review_policy_for_band
 from pahs.graph.state import PAHSState
+from pahs.planning.orchestrator_planner import build_execution_plan
+from pahs.planning.task_context import effective_task_prompt
 from pahs.providers.mock import mock_plan
 from pahs.providers.router import llm_complete
 from pahs.routing.cost_estimator import estimate_run_cost, record_cost_event
@@ -48,17 +50,38 @@ def orchestrator_plan_node(state: PAHSState) -> dict:
     routing_context = state.get("routing_context", {})
     task_type = state.get("task_type", "general_task")
 
+    execution_plan = build_execution_plan(
+        state["user_command"],
+        routing_context=routing_context,
+        triage_result=triage,
+        worker=state.get("worker", "creator"),
+        execution_mode=state.get("execution_mode"),
+        external_agent=state.get("external_agent", ""),
+        complexity_band=state.get("complexity_band", "medium"),
+        orchestrator_profile=profile,
+        task_type=task_type,
+        run_id=state["run_id"],
+        prefer_llm=True,
+    )
+
     routing_decision = route_model(routing_context)
     cost_estimate = estimate_run_cost(routing_context, routing_decision)
-    standards = load_standards_for_task(task_type)
+    standards = load_standards_for_task(execution_plan.task_type)
 
     plan = mock_plan(state["user_command"], profile, triage)
+    plan["execution_plan"] = execution_plan.to_storage_dict()
+    plan["intent_summary"] = execution_plan.intent_summary
+    plan["plan_source"] = execution_plan.source
     plan["routing_decision"] = routing_decision
     plan["cost_estimate"] = cost_estimate
     plan["standards_paths"] = standards["paths"]
     plan["estimated_cost_usd"] = cost_estimate["estimated_cost_usd"]
+    plan["worker"] = execution_plan.primary_worker()
 
     milestone = plan["milestones"][0]
+    milestone["id"] = execution_plan.phases[0].id
+    milestone["title"] = execution_plan.phases[0].title
+
     db.update_run(
         state["run_id"],
         orchestrator_profile=profile,
@@ -72,25 +95,35 @@ def orchestrator_plan_node(state: PAHSState) -> dict:
     )
     db.log_event(
         state["run_id"],
-        "routing_decision",
+        "orchestrator_plan_created",
         {
+            "execution_plan": execution_plan.to_storage_dict(),
+            "plan_source": execution_plan.source,
+            "phase_count": execution_plan.phase_count(),
+            "task_count": execution_plan.task_count(),
             "routing_decision": routing_decision,
             "cost_estimate": cost_estimate,
-            "standards_paths": standards["paths"],
         },
     )
 
-    worker = plan.get("worker", state.get("worker", "creator"))
-    execution_mode = plan.get("execution_mode", state.get("execution_mode"))
+    worker = execution_plan.primary_worker()
+    first_task = execution_plan.phases[0].tasks[0]
+    execution_mode = first_task.execution_mode or state.get("execution_mode")
+    external_agent = first_task.external_agent or state.get("external_agent", "")
+    if worker == "external" and external_agent:
+        execution_mode = external_agent
+
     return {
         "plan": plan,
+        "execution_plan": execution_plan.to_storage_dict(),
         "milestone_id": milestone["id"],
         "worker": worker,
         "execution_mode": execution_mode,
-        "external_agent": state.get("external_agent", ""),
+        "external_agent": external_agent,
         "routing_decision": routing_decision,
         "cost_estimate": cost_estimate,
         "standards_loaded": standards["paths"],
+        "review_policy": execution_plan.review_policy,
         "status": "PLANNED",
     }
 
@@ -102,7 +135,7 @@ def creator_node(state: PAHSState) -> dict:
             "You are PAHS Creator. Write the deliverable requested by the user. "
             "Be clear, useful, and concise unless the user asks for length."
         ),
-        user=state["user_command"],
+        user=effective_task_prompt(state),
         model=model,
         run_id=state["run_id"],
         phase="creator",

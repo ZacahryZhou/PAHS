@@ -19,6 +19,13 @@ class PAHSState(TypedDict, total=False):
     complexity_band: Literal["simple", "medium", "complex"]
     review_policy: dict[str, Any]
     plan: dict[str, Any]
+    execution_plan: dict[str, Any]
+    plan_phase_index: int
+    plan_artifacts: dict[str, Any]
+    current_task: dict[str, Any]
+    current_phase_id: str
+    task_prompt: str
+    plan_progress: str
     milestone_id: str
     milestone_output: str
     loaded_rules: list[str]

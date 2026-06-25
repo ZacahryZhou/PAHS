@@ -131,6 +131,34 @@ def rules_show(scope: str = typer.Argument("global", help="global | creator | se
         typer.echo(f"- {path}")
 
 
+@app.command("plan-preview")
+def plan_preview(command: str) -> None:
+    """Preview internal ExecutionPlan (orchestrator task table) without running."""
+    from pahs.planning.orchestrator_planner import build_execution_plan
+    from pahs.planning.step_router import validation_report
+    from pahs.routing.task_classifier import classify_command
+
+    classified = classify_command(command)
+    plan = build_execution_plan(
+        command,
+        routing_context=classified["routing_context"],
+        triage_result=classified["triage_result"],
+        worker=classified["worker"],
+        execution_mode=classified["execution_mode"],
+        complexity_band=classified["complexity_band"],
+        orchestrator_profile=classified["orchestrator_profile"],
+        task_type=classified["task_type"],
+        prefer_llm=True,
+    )
+    payload = {
+        "command": command,
+        "plan_source": plan.source,
+        "execution_plan": plan.to_storage_dict(),
+        "validation": validation_report(plan),
+    }
+    typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
+
+
 @app.command("route-preview")
 def route_preview(command: str) -> None:
     """Preview routing, model choice, and cost estimate without running."""

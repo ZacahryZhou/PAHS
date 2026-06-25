@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pahs.agents.search_router import route_search_task
+from pahs.planning.task_context import effective_task_prompt
 from pahs.graph.state import PAHSState
 from pahs.providers.router import llm_complete
 from pahs.tools.registry import call_tool
@@ -27,7 +28,7 @@ def _format_sources(sources: list[dict]) -> str:
 def searcher_node(state: PAHSState) -> dict:
     command = state["user_command"]
     feedback = state.get("user_milestone_review", "").strip()
-    query = feedback or command
+    query = effective_task_prompt(state)
 
     routing_context = state.get("routing_context") or {}
     search_mode = _resolve_provider()

@@ -122,6 +122,9 @@ def execute_smas_review(
     db.update_run(run_id, status="COMPLETED")
     db.log_event(run_id, "smas_review_reply", {"action": action, "text": review_text})
 
+    preview = result.get("preview_image") or (result.get("parsed_json") or {}).get("preview_image")
+    image_path = str(preview) if preview and Path(str(preview)).exists() else None
+
     if action == "approve":
         text = "已保存草稿，这版定稿了。"
     elif image_path:
@@ -129,8 +132,6 @@ def execute_smas_review(
         text = "已按你的意见改好了，请看新预览：" + (f"\n\n{caption}" if caption else "")
     else:
         text = str(result.get("text") or "已按你的意见修改。")
-    preview = result.get("preview_image") or (result.get("parsed_json") or {}).get("preview_image")
-    image_path = str(preview) if preview and Path(str(preview)).exists() else None
 
     return {
         "action": "deliver",

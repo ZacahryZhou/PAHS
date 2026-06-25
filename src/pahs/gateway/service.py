@@ -9,6 +9,13 @@ from pahs.config_loader import gateway_config
 from pahs.external.registry import match_external_agent
 from pahs.gateway.direct_tools import execute_direct_tool
 from pahs.gateway.intent_router import infer_external_agent
+from pahs.gateway.persona import (
+    PAHS_PERSONA_SYSTEM,
+    friendly_help,
+    normalize_telegram_input,
+    quick_reply,
+    strip_robotic_prefix,
+)
 from pahs.gateway.run_ids import new_run_id
 from pahs.graph.runner import resume_run, start_run
 from pahs.storage import db
@@ -72,19 +79,21 @@ def format_pending_lines() -> list[str]:
 
 
 def _handle_telegram_chat(text: str) -> dict[str, Any]:
+    if text == "__help__":
+        return {"action": "chat", "text": friendly_help()}
+
+    fast = quick_reply(text)
+    if fast:
+        return {"action": "chat", "text": fast}
+
     from pahs.providers.router import llm_complete
 
     answer = llm_complete(
-        system=(
-            "You are PAHS, the user's main personal agent orchestrator. "
-            "Answer clearly in the user's language. "
-            "If they want an Instagram post, suggest they ask for IG/图文 content. "
-            "If they want a video, suggest 短视频/视频."
-        ),
+        system=PAHS_PERSONA_SYSTEM,
         user=text,
         phase="telegram_chat",
     )
-    return {"action": "chat", "text": answer}
+    return {"action": "chat", "text": strip_robotic_prefix(answer)}
 
 
 def handle_inbound_text(
@@ -93,10 +102,13 @@ def handle_inbound_text(
     channel: str,
     channel_user_id: str,
     user_id: str = "default",
+    normalized: bool = False,
 ) -> dict[str, Any]:
     db.init_db()
     db.resolve_user_id(channel, channel_user_id, default=user_id)
     stripped = text.strip()
+    if channel == "telegram" and not normalized:
+        stripped = normalize_telegram_input(stripped)
 
     reply = parse_reply_command(text)
     if reply is not None:
@@ -134,16 +146,4 @@ def handle_inbound_text(
     if channel == "telegram" and _telegram_chat_fallback() and stripped:
         return _handle_telegram_chat(stripped)
 
-    return {
-        "action": "help",
-        "message": (
-            "PAHS main agent ready.\n\n"
-            "Telegram direct mode:\n"
-            "- 给咖啡店做一条开业 IG 图文\n"
-            "- 做一个 10 秒咖啡宣传短视频\n\n"
-            "Advanced:\n"
-            "run <command>\n"
-            "reply <run_id> approved\n"
-            "pending"
-        ),
-    }
+    return {"action": "chat", "text": friendly_help()}

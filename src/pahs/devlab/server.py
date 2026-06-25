@@ -12,7 +12,7 @@ from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from pahs.devlab.architecture_map import build_progress
+from pahs.devlab.architecture_map import build_progress, default_progress
 from pahs.devlab.run_manager import get_handle, resume_run_async, run_snapshot, start_run_async
 from pahs.storage import db
 
@@ -37,6 +37,17 @@ def _startup() -> None:
 @app.get("/")
 def index() -> FileResponse:
     return FileResponse(STATIC_DIR / "index.html")
+
+
+@app.get("/api/architecture")
+def get_architecture_template() -> dict[str, Any]:
+    """Return full PAHS Path A pipeline (idle) for Dev Lab right panel."""
+    progress = default_progress()
+    return {
+        "description": "PAHS Path A — LangGraph full team pipeline",
+        "path_b_note": "Telegram SMAS/PIP shortcut bypasses this graph",
+        **progress,
+    }
 
 
 @app.post("/api/chat")

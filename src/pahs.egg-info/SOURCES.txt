@@ -14,6 +14,8 @@ src/pahs.egg-info/top_level.txt
 src/pahs/agents/__init__.py
 src/pahs/agents/executor.py
 src/pahs/agents/external.py
+src/pahs/agents/plan_nodes.py
+src/pahs/agents/search_router.py
 src/pahs/agents/searcher.py
 src/pahs/agents/week1.py
 src/pahs/builder/__init__.py
@@ -21,6 +23,10 @@ src/pahs/builder/builder.py
 src/pahs/builder/review.py
 src/pahs/builder/sandbox.py
 src/pahs/builder/tool_manifest.py
+src/pahs/devlab/__init__.py
+src/pahs/devlab/architecture_map.py
+src/pahs/devlab/run_manager.py
+src/pahs/devlab/server.py
 src/pahs/external/__init__.py
 src/pahs/external/openclaw_bridge.py
 src/pahs/external/pip_bridge.py
@@ -37,6 +43,7 @@ src/pahs/gateway/persona.py
 src/pahs/gateway/run_ids.py
 src/pahs/gateway/service.py
 src/pahs/gateway/telegram_adapter.py
+src/pahs/gateway/telegram_session.py
 src/pahs/gateway/whatsapp_adapter.py
 src/pahs/graph/__init__.py
 src/pahs/graph/checkpoints.py
@@ -54,6 +61,14 @@ src/pahs/learning/__init__.py
 src/pahs/learning/approvals.py
 src/pahs/learning/learner.py
 src/pahs/learning/proposals.py
+src/pahs/planning/__init__.py
+src/pahs/planning/capability_catalog.py
+src/pahs/planning/orchestrator_planner.py
+src/pahs/planning/plan_executor.py
+src/pahs/planning/plan_patterns.py
+src/pahs/planning/schema.py
+src/pahs/planning/step_router.py
+src/pahs/planning/task_context.py
 src/pahs/providers/__init__.py
 src/pahs/providers/deepseek.py
 src/pahs/providers/mock.py

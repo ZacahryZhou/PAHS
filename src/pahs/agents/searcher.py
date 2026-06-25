@@ -56,6 +56,13 @@ def searcher_node(state: PAHSState) -> dict:
 
     route_block = ""
     if route_decision is not None:
+        from pahs.storage import db
+
+        db.log_event(
+            state["run_id"],
+            "search_route",
+            route_decision.to_dict(),
+        )
         route_block = (
             f"Search route level: {route_decision.level}\n"
             f"Route score: {route_decision.score}\n"

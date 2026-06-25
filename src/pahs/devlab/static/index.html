@@ -6,16 +6,13 @@
   <title>PAHS Dev Lab</title>
   <style>
     :root {
-      --bg: #0f1419;
-      --panel: #1a2332;
-      --border: #2d3a4f;
-      --text: #e7ecf3;
-      --muted: #8b9cb3;
-      --accent: #3b82f6;
-      --green: #22c55e;
-      --amber: #f59e0b;
-      --pink: #ec4899;
-      --red: #ef4444;
+      --bg: #ffffff;
+      --panel: #fafafa;
+      --border: #d4d4d4;
+      --text: #0a0a0a;
+      --muted: #737373;
+      --active-bg: #f5f5f5;
+      --waiting-bg: #ebebeb;
     }
     * { box-sizing: border-box; }
     body {
@@ -35,12 +32,12 @@
       justify-content: space-between;
       background: var(--panel);
     }
-    header h1 { margin: 0; font-size: 1.1rem; font-weight: 600; }
-    header .meta { font-size: 0.8rem; color: var(--muted); }
+    header h1 { margin: 0; font-size: 1rem; font-weight: 600; letter-spacing: 0.02em; }
+    header .meta { font-size: 0.78rem; color: var(--muted); font-family: ui-monospace, monospace; }
     main {
       flex: 1;
       display: grid;
-      grid-template-columns: 1fr 380px;
+      grid-template-columns: 1fr 400px;
       min-height: 0;
     }
     .chat-panel, .progress-panel {
@@ -51,11 +48,12 @@
     .chat-panel { border-right: 1px solid var(--border); }
     .panel-title {
       padding: 10px 16px;
-      font-size: 0.75rem;
+      font-size: 0.7rem;
       text-transform: uppercase;
-      letter-spacing: 0.06em;
+      letter-spacing: 0.08em;
       color: var(--muted);
       border-bottom: 1px solid var(--border);
+      font-weight: 600;
     }
     #messages {
       flex: 1;
@@ -63,35 +61,32 @@
       padding: 16px;
       display: flex;
       flex-direction: column;
-      gap: 12px;
+      gap: 10px;
     }
     .msg {
-      max-width: 90%;
+      max-width: 88%;
       padding: 10px 14px;
-      border-radius: 12px;
-      line-height: 1.5;
-      font-size: 0.9rem;
+      border-radius: 6px;
+      line-height: 1.55;
+      font-size: 0.88rem;
       white-space: pre-wrap;
       word-break: break-word;
     }
     .msg.user {
       align-self: flex-end;
-      background: var(--accent);
+      background: #0a0a0a;
       color: #fff;
-      border-bottom-right-radius: 4px;
     }
     .msg.assistant {
       align-self: flex-start;
       background: var(--panel);
       border: 1px solid var(--border);
-      border-bottom-left-radius: 4px;
     }
     .msg.system {
       align-self: center;
-      background: transparent;
       color: var(--muted);
-      font-size: 0.8rem;
-      padding: 4px;
+      font-size: 0.78rem;
+      padding: 2px;
     }
     .composer {
       padding: 12px 16px;
@@ -99,6 +94,7 @@
       display: flex;
       gap: 8px;
       flex-wrap: wrap;
+      background: var(--panel);
     }
     textarea {
       flex: 1;
@@ -106,85 +102,97 @@
       min-height: 44px;
       max-height: 120px;
       resize: vertical;
-      background: var(--bg);
+      background: #fff;
       border: 1px solid var(--border);
-      border-radius: 8px;
+      border-radius: 4px;
       color: var(--text);
       padding: 10px 12px;
       font: inherit;
     }
+    textarea:focus { outline: 2px solid #0a0a0a; outline-offset: 0; }
     button {
-      background: var(--accent);
+      background: #0a0a0a;
       color: #fff;
-      border: none;
-      border-radius: 8px;
+      border: 1px solid #0a0a0a;
+      border-radius: 4px;
       padding: 10px 16px;
       font: inherit;
       cursor: pointer;
       font-weight: 500;
     }
-    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    button:disabled { opacity: 0.4; cursor: not-allowed; }
     button.secondary {
-      background: transparent;
-      border: 1px solid var(--border);
-      color: var(--text);
+      background: #fff;
+      color: #0a0a0a;
     }
-    button.approve { background: var(--green); }
     #progress-nodes {
       flex: 1;
       overflow-y: auto;
-      padding: 12px;
+      padding: 10px 12px;
       display: flex;
       flex-direction: column;
-      gap: 6px;
+      gap: 4px;
     }
     .node {
-      display: flex;
-      align-items: flex-start;
+      display: grid;
+      grid-template-columns: 14px 1fr auto;
+      align-items: center;
       gap: 10px;
       padding: 8px 10px;
-      border-radius: 8px;
       border: 1px solid var(--border);
-      background: var(--bg);
-      font-size: 0.82rem;
-      transition: border-color 0.2s, background 0.2s;
+      background: #fff;
+      font-size: 0.8rem;
     }
     .node .dot {
-      width: 10px;
-      height: 10px;
+      width: 8px;
+      height: 8px;
       border-radius: 50%;
-      margin-top: 4px;
-      flex-shrink: 0;
-      background: var(--muted);
+      border: 1px solid #a3a3a3;
+      background: #fff;
     }
-    .node.pending .dot { background: #475569; }
-    .node.active .dot { background: var(--amber); box-shadow: 0 0 8px var(--amber); }
-    .node.done .dot { background: var(--green); }
-    .node.waiting .dot { background: var(--pink); box-shadow: 0 0 8px var(--pink); }
-    .node.failed .dot { background: var(--red); }
-    .node.active { border-color: var(--amber); background: #1c1910; }
-    .node.waiting { border-color: var(--pink); background: #1c1018; }
+    .node.pending .dot { background: #fff; }
+    .node.active { background: var(--active-bg); border-color: #0a0a0a; border-width: 2px; }
+    .node.active .dot { background: #0a0a0a; border-color: #0a0a0a; }
+    .node.done .dot { background: #0a0a0a; border-color: #0a0a0a; }
+    .node.waiting { background: var(--waiting-bg); border-style: dashed; }
+    .node.waiting .dot { background: #737373; }
+    .node.failed { border-color: #0a0a0a; opacity: 0.5; text-decoration: line-through; }
     .node-label { font-weight: 500; }
-    .node-sub { color: var(--muted); font-size: 0.75rem; margin-top: 2px; }
-    #timeline {
-      max-height: 160px;
-      overflow-y: auto;
-      border-top: 1px solid var(--border);
+    .node-layer {
+      font-size: 0.68rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .node-status {
+      font-size: 0.68rem;
+      color: var(--muted);
+      font-family: ui-monospace, monospace;
+      text-transform: uppercase;
+    }
+  .arch-hint {
       padding: 8px 12px;
       font-size: 0.72rem;
       color: var(--muted);
+      border-bottom: 1px solid var(--border);
+      line-height: 1.4;
     }
-    #timeline div { padding: 2px 0; }
-    .review-box {
-      width: 100%;
-      padding: 8px 16px 0;
-      display: none;
+    #timeline {
+      max-height: 140px;
+      overflow-y: auto;
+      border-top: 1px solid var(--border);
+      padding: 8px 12px;
+      font-size: 0.7rem;
+      color: var(--muted);
+      font-family: ui-monospace, monospace;
+      background: var(--panel);
     }
+    #timeline div { padding: 2px 0; border-bottom: 1px solid #eee; }
+    .review-box { width: 100%; padding: 8px 16px 0; display: none; }
     .review-box.visible { display: block; }
     .review-preview {
-      background: var(--bg);
-      border: 1px solid var(--pink);
-      border-radius: 8px;
+      background: #fff;
+      border: 1px dashed var(--border);
       padding: 10px;
       font-size: 0.8rem;
       max-height: 160px;
@@ -198,29 +206,29 @@
   <header>
     <h1>PAHS Dev Lab</h1>
     <div class="meta">
-      <span id="run-label">no active run</span>
-      · <span id="status-label">idle</span>
+      <span id="run-label">idle</span> · <span id="status-label">ready</span>
     </div>
   </header>
   <main>
     <section class="chat-panel">
-      <div class="panel-title">Chat · 开发测试对话</div>
+      <div class="panel-title">Chat</div>
       <div id="messages"></div>
       <div class="review-box" id="review-box">
         <div class="review-preview" id="review-preview"></div>
         <div class="composer">
           <textarea id="review-input" placeholder="修改意见，或点通过"></textarea>
-          <button type="button" class="approve" id="approve-btn">通过</button>
+          <button type="button" class="secondary" id="approve-btn">通过</button>
           <button type="button" class="secondary" id="reply-btn">提交修改</button>
         </div>
       </div>
       <div class="composer" id="main-composer">
-        <textarea id="input" placeholder="输入命令，例如：调研 LangGraph 并写中文摘要"></textarea>
+        <textarea id="input" placeholder="发命令测试；输入「架构」只查看右侧流程图"></textarea>
         <button type="button" id="send-btn">发送</button>
       </div>
     </section>
     <section class="progress-panel">
-      <div class="panel-title">Architecture · 实时进度</div>
+      <div class="panel-title">Architecture · Path A</div>
+      <div class="arch-hint">打开页面即显示完整 LangGraph 流水线。发送命令后节点会实时高亮。</div>
       <div id="progress-nodes"></div>
       <div id="timeline"></div>
     </section>
@@ -242,7 +250,18 @@
 
     let currentRunId = null;
     let eventSource = null;
-    let nodeTemplate = [];
+    let pollTimer = null;
+
+    const ARCH_HELP =
+      "PAHS Path A 完整架构（右侧已列出全部节点）：\n\n" +
+      "用户输入 → Ingest → Global Rules → Triage → Orchestrator（写 ExecutionPlan）\n" +
+      "→ Plan Validate → Env/Budget → Target Rules → Execute Phase（可并行 Task）\n" +
+      "→ Search Router（仅 Searcher）→ Verify → 人工审核 → 最终交付 → Learner\n\n" +
+      "Telegram 发 IG/视频 走 Path B 直达 SMAS/PIP，不经过此图。";
+
+    function isArchQuery(text) {
+      return /^(目前)?架构$|^architecture$|^流程$|^pipeline$/i.test(text.trim());
+    }
 
     function addMessage(role, text) {
       const el = document.createElement("div");
@@ -253,27 +272,47 @@
     }
 
     function renderNodes(progress) {
-      if (!progress || !progress.nodes) return;
-      if (nodeTemplate.length === 0) nodeTemplate = progress.nodes;
+      if (!progress || !Array.isArray(progress.nodes) || progress.nodes.length === 0) {
+        progressNodesEl.innerHTML = '<div class="arch-hint">无法加载架构节点</div>';
+        return;
+      }
       progressNodesEl.innerHTML = "";
       progress.nodes.forEach((node) => {
         const el = document.createElement("div");
-        el.className = `node ${node.status}`;
+        el.className = `node ${node.status || "pending"}`;
         el.innerHTML = `
-          <div class="dot" style="background:${node.status === "pending" ? "#475569" : node.color}"></div>
-          <div>
-            <div class="node-label">${node.label_zh || node.label}</div>
-            <div class="node-sub">${node.layer} · ${node.status}</div>
-          </div>`;
+          <div class="dot"></div>
+          <div class="node-label">${node.label_zh || node.label}</div>
+          <div class="node-status">${node.status || "pending"}</div>`;
+        const layer = document.createElement("div");
+        layer.className = "node-layer";
+        layer.style.gridColumn = "2 / -1";
+        layer.textContent = node.layer || "";
+        el.appendChild(layer);
         progressNodesEl.appendChild(el);
       });
     }
 
     function renderTimeline(progress) {
-      if (!progress || !progress.timeline) return;
-      timelineEl.innerHTML = progress.timeline.slice(-12).map((item) =>
-        `<div>${item.created_at || ""} · ${item.summary || item.event_type}</div>`
+      if (!progress || !progress.timeline || progress.timeline.length === 0) {
+        timelineEl.innerHTML = '<div>事件时间线（运行后出现）</div>';
+        return;
+      }
+      timelineEl.innerHTML = progress.timeline.slice(-14).map((item) =>
+        `<div>${(item.created_at || "").slice(11, 19)} ${item.summary || item.event_type}</div>`
       ).join("");
+    }
+
+    async function loadArchitecture() {
+      try {
+        const res = await fetch("/api/architecture");
+        if (!res.ok) throw new Error("bad status");
+        const data = await res.json();
+        renderNodes(data);
+        renderTimeline(data);
+      } catch (e) {
+        progressNodesEl.innerHTML = '<div class="arch-hint">加载失败，请重启 pah dev-ui</div>';
+      }
     }
 
     function setReviewMode(snapshot) {
@@ -289,11 +328,46 @@
       }
     }
 
+    function stopPolling() {
+      if (pollTimer) {
+        clearInterval(pollTimer);
+        pollTimer = null;
+      }
+    }
+
+    function startPolling(runId) {
+      stopPolling();
+      pollTimer = setInterval(async () => {
+        try {
+          const res = await fetch(`/api/runs/${runId}/progress`);
+          if (!res.ok) return;
+          const data = await res.json();
+          renderNodes(data);
+          renderTimeline(data);
+          if (data.snapshot) {
+            runLabel.textContent = data.snapshot.run_id;
+            statusLabel.textContent = data.snapshot.status;
+            setReviewMode(data.snapshot);
+          }
+          const st = data.snapshot && data.snapshot.status;
+          if (st === "COMPLETED" || st === "FAILED" || st === "BLOCKED") {
+            if (!data.snapshot.waiting_review) {
+              stopPolling();
+              sendBtn.disabled = false;
+            }
+          }
+        } catch (e) { /* ignore */ }
+      }, 500);
+    }
+
     function connectStream(runId) {
       if (eventSource) eventSource.close();
+      startPolling(runId);
+
       eventSource = new EventSource(`/api/runs/${runId}/events/stream`);
       eventSource.onmessage = (ev) => {
-        const data = JSON.parse(ev.data);
+        let data;
+        try { data = JSON.parse(ev.data); } catch { return; }
         if (data.done) {
           eventSource.close();
           sendBtn.disabled = false;
@@ -320,41 +394,53 @@
             addMessage("system", "Run completed.");
           }
           if (event.event_type === "devlab_run_failed") {
-            addMessage("system", "Run failed: " + (event.payload?.error || "unknown"));
+            addMessage("system", "Run failed: " + ((event.payload && event.payload.error) || "unknown"));
           }
         });
       };
       eventSource.onerror = () => {
         eventSource.close();
-        sendBtn.disabled = false;
+        /* polling keeps working */
       };
     }
 
     async function sendChat() {
       const text = inputEl.value.trim();
       if (!text) return;
+
+      if (isArchQuery(text)) {
+        addMessage("user", text);
+        addMessage("assistant", ARCH_HELP);
+        inputEl.value = "";
+        await loadArchitecture();
+        return;
+      }
+
       sendBtn.disabled = true;
       addMessage("user", text);
       inputEl.value = "";
 
-      const res = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: text }),
-      });
-      const data = await res.json();
-      currentRunId = data.run_id;
-      runLabel.textContent = currentRunId;
-      statusLabel.textContent = data.status;
-      addMessage("system", `Run started: ${currentRunId}`);
-      connectStream(currentRunId);
+      try {
+        const res = await fetch("/api/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message: text }),
+        });
+        const data = await res.json();
+        currentRunId = data.run_id;
+        runLabel.textContent = currentRunId;
+        statusLabel.textContent = data.status || "ACTIVE";
+        addMessage("system", "Run started: " + currentRunId);
+        connectStream(currentRunId);
+      } catch (e) {
+        addMessage("system", "启动失败: " + e.message);
+        sendBtn.disabled = false;
+      }
     }
 
     async function sendReply(message) {
       if (!currentRunId) return;
       sendBtn.disabled = true;
-      approveBtn.disabled = true;
-      replyBtn.disabled = true;
       addMessage("user", message);
       await fetch(`/api/runs/${currentRunId}/reply`, {
         method: "POST",
@@ -363,8 +449,6 @@
       });
       messagesEl.querySelectorAll("[data-review]").forEach((el) => el.removeAttribute("data-review"));
       connectStream(currentRunId);
-      approveBtn.disabled = false;
-      replyBtn.disabled = false;
     }
 
     sendBtn.addEventListener("click", sendChat);
@@ -380,18 +464,8 @@
       if (text) sendReply(text);
     });
 
-    fetch("/api/runs/__bootstrap__/progress").catch(() => {
-      renderNodes({
-        nodes: [
-          { id: "ingest", label_zh: "接收任务", layer: "gateway", status: "pending", color: "#64748b" },
-          { id: "triage_score", label_zh: "① Triage", layer: "routing", status: "pending", color: "#f59e0b" },
-          { id: "orchestrator_plan", label_zh: "🎯 Orchestrator", layer: "orchestrator", status: "pending", color: "#3b82f6" },
-          { id: "execute_plan_phase", label_zh: "执行 Phase", layer: "execution", status: "pending", color: "#22c55e" },
-          { id: "milestone_review", label_zh: "⏸ 审核", layer: "human", status: "pending", color: "#ec4899" },
-        ],
-        timeline: [],
-      });
-    });
+    loadArchitecture();
+    addMessage("system", "Dev Lab ready — 右侧为完整架构；输入「架构」查看说明。");
   </script>
 </body>
 </html>

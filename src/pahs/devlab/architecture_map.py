@@ -8,15 +8,15 @@ from typing import Any
 GRAPH_NODES: list[dict[str, str]] = [
     {"id": "ingest", "label": "Ingest", "layer": "gateway", "label_zh": "接收任务"},
     {"id": "load_global_rules", "label": "Global Rules", "layer": "harness", "label_zh": "全局规则"},
-    {"id": "triage_score", "label": "Triage", "layer": "routing", "label_zh": "① 分诊 Triage"},
-    {"id": "orchestrator_plan", "label": "Orchestrator", "layer": "orchestrator", "label_zh": "🎯 编排任务表"},
-    {"id": "plan_validate", "label": "Plan Validate", "layer": "routing", "label_zh": "② 计划校验"},
+    {"id": "triage_score", "label": "Triage", "layer": "routing", "label_zh": "分诊 Triage"},
+    {"id": "orchestrator_plan", "label": "Orchestrator", "layer": "orchestrator", "label_zh": "编排 Orchestrator"},
+    {"id": "plan_validate", "label": "Plan Validate", "layer": "routing", "label_zh": "计划校验 Step Router"},
     {"id": "env_precheck", "label": "Env Precheck", "layer": "harness", "label_zh": "环境/预算"},
     {"id": "load_target_rules", "label": "Target Rules", "layer": "harness", "label_zh": "专员规则"},
     {"id": "execute_plan_phase", "label": "Execute Phase", "layer": "execution", "label_zh": "执行 Phase"},
-    {"id": "search_router", "label": "Search Router", "layer": "routing", "label_zh": "③ Search 路由"},
+    {"id": "search_router", "label": "Search Router", "layer": "routing", "label_zh": "Search 路由"},
     {"id": "verify_pipeline", "label": "Verify", "layer": "harness", "label_zh": "质量验证"},
-    {"id": "milestone_review", "label": "Milestone Review", "layer": "human", "label_zh": "⏸ 人工审核"},
+    {"id": "milestone_review", "label": "Milestone Review", "layer": "human", "label_zh": "人工审核"},
     {"id": "final_present", "label": "Final Delivery", "layer": "human", "label_zh": "最终交付"},
     {"id": "learner", "label": "Learner", "layer": "learning", "label_zh": "Learner 学习"},
 ]
@@ -42,14 +42,19 @@ EVENT_TO_NODE: dict[str, str] = {
 }
 
 LAYER_COLORS: dict[str, str] = {
-    "gateway": "#64748b",
-    "routing": "#f59e0b",
-    "orchestrator": "#3b82f6",
-    "harness": "#8b5cf6",
-    "execution": "#22c55e",
-    "human": "#ec4899",
-    "learning": "#06b6d4",
+    "gateway": "#888888",
+    "routing": "#666666",
+    "orchestrator": "#000000",
+    "harness": "#444444",
+    "execution": "#333333",
+    "human": "#111111",
+    "learning": "#555555",
 }
+
+
+def default_progress(*, run_status: str = "idle") -> dict[str, Any]:
+    """Idle architecture template — all nodes visible before any run."""
+    return build_progress([], run_status=run_status, waiting_review=False)
 
 
 def _rules_loaded_node(payload: dict[str, Any]) -> str:

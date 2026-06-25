@@ -6,3 +6,7 @@ __pycache__/
 .pah/
 data/
 *.db
+rules/learnings/pending/*.json
+rules/learnings/approved/*.json
+rules/learnings/rejected/*.json
+!rules/learnings/**/.gitkeep

@@ -170,6 +170,16 @@ def plan_code_actions(result: BatchResult, payload: dict[str, Any]) -> list[Code
                 acceptance="Re-run dev-batch; run_failed count is 0.",
             )
         )
+    if defect_keys.get("run_blocked", 0):
+        actions.append(
+            CodeAction(
+                priority="P0",
+                title="Fix batch budget isolation",
+                files=["src/pahs/devlab/batch_runner.py", "src/pahs/harness/budget.py", "config/budget.yaml"],
+                description="Runs blocked by daily/run budget during dev-batch.",
+                acceptance="100-run dev-batch completes without BLOCKED status.",
+            )
+        )
     if defect_keys.get("incomplete_run", 0):
         actions.append(
             CodeAction(

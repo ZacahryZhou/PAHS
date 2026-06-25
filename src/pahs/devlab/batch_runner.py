@@ -13,6 +13,7 @@ import yaml
 
 from pahs.gateway.run_ids import new_run_id
 from pahs.graph.runner import resume_run, start_run
+from pahs.harness.budget import BudgetManager
 from pahs.paths import PROJECT_ROOT
 from pahs.storage import db
 
@@ -166,6 +167,8 @@ def infer_defects(summary: RunSummary) -> list[str]:
     defects: list[str] = []
     if summary.status == "FAILED":
         defects.append(f"run_failed: {'; '.join(summary.errors) or 'unknown error'}")
+    if summary.status == "BLOCKED":
+        defects.append("run_blocked: budget or environment precheck blocked execution")
     if summary.validation_failed:
         defects.append(f"validation_failed: {summary.validation_message or 'no message'}")
     if summary.plan_valid is False:
@@ -253,6 +256,10 @@ def run_single_scenario(
     if not command:
         raise ValueError(f"Scenario {scenario.get('id')} has empty command")
 
+    if channel == "dev-batch":
+        # Each batch iteration should be independent; don't let daily budget accumulate.
+        BudgetManager.reset_daily()
+
     start_run(run_id, command, channel=channel)
     return auto_complete_run(
         run_id,
@@ -278,6 +285,7 @@ def run_batch(
 
     ctx = force_mock_llm() if mock_llm else nullcontext()
     with ctx:
+        BudgetManager.reset_daily()
         for index, scenario in enumerate(plan, start=1):
             summary = run_single_scenario(scenario, with_learner=with_learner)
             summaries.append(summary)

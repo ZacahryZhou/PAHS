@@ -24,7 +24,9 @@ _GAP_PATTERNS: list[tuple[str, str, str]] = [
         "无法登录或代运营真实平台账号",
     ),
     (
-        r"直接发布|发帖到|publish to|post to (instagram|youtube|bilibili|tiktok)",
+        r"直接.{0,20}发布|直接发布|发帖到|"
+        r"发布到.{0,12}(instagram|ig|youtube|bilibili|tiktok|抖音|小红书|微信|微博)|"
+        r"publish to|post to (instagram|youtube|bilibili|tiktok)",
         "direct_social_publish",
         "无法直接向社交平台发帖（除非走 External: SMAS/PIP 做内容，仍需人工发布）",
     ),

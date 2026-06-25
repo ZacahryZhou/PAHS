@@ -62,6 +62,7 @@ def render_markdown_report(result: BatchResult) -> str:
     total = len(summaries)
     completed = sum(1 for item in summaries if item.status == "COMPLETED")
     failed = sum(1 for item in summaries if item.status == "FAILED")
+    blocked = sum(1 for item in summaries if item.status == "BLOCKED")
     stuck = sum(
         1
         for item in summaries
@@ -94,6 +95,7 @@ def render_markdown_report(result: BatchResult) -> str:
         "",
         f"- Completed | 完成: **{completed}/{total}** ({_pct(completed, total)})",
         f"- Failed | 失败: **{failed}/{total}** ({_pct(failed, total)})",
+        f"- Blocked | 预算/环境阻断: **{blocked}/{total}** ({_pct(blocked, total)})",
         f"- Stuck / incomplete | 卡住: **{stuck}/{total}** ({_pct(stuck, total)})",
         f"- Runs with defects | 有缺陷的运行: **{with_defects}/{total}** ({_pct(with_defects, total)})",
         f"- Validation failures | 校验失败: **{validation_failures}/{total}**",
@@ -145,11 +147,11 @@ def render_markdown_report(result: BatchResult) -> str:
     lines.append(build_handoff_block(result))
     lines.append("```")
 
-    lines.extend(["", "## Failed / Stuck Runs | 失败与卡住明细", ""])
+    lines.extend(["", "## Failed / Blocked / Stuck Runs | 失败、阻断与卡住明细", ""])
     problem_runs = [
         item
         for item in summaries
-        if item.status in {"FAILED", "AWAITING_REVIEW", "AWAITING_FINAL_FEEDBACK", "ACTIVE"}
+        if item.status in {"FAILED", "BLOCKED", "AWAITING_REVIEW", "AWAITING_FINAL_FEEDBACK", "ACTIVE"}
         or item.defects
     ]
     if not problem_runs:
@@ -184,6 +186,11 @@ def build_recommendations(result: BatchResult) -> list[str]:
         for defect in summary.defects:
             defect_keys[defect.split(":", 1)[0]] += 1
 
+    if defect_keys.get("run_blocked", 0) > 0:
+        recs.append(
+            "Reset per-run budget in dev-batch or raise config/budget.yaml limits "
+            "（批量测试应隔离预算，或调高 budget 限额）"
+        )
     if defect_keys.get("run_failed", 0) > 0:
         recs.append(
             "Investigate graph failures and add regression tests for failing scenarios "
